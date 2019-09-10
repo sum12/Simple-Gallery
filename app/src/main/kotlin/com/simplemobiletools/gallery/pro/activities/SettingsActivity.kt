@@ -11,6 +11,7 @@ import com.simplemobiletools.commons.models.RadioItem
 import com.simplemobiletools.gallery.pro.R
 import com.simplemobiletools.gallery.pro.dialogs.ManageBottomActionsDialog
 import com.simplemobiletools.gallery.pro.dialogs.ManageExtendedDetailsDialog
+import com.simplemobiletools.gallery.pro.dialogs.ServerUrlDialog
 import com.simplemobiletools.gallery.pro.extensions.config
 import com.simplemobiletools.gallery.pro.extensions.emptyTheRecycleBin
 import com.simplemobiletools.gallery.pro.extensions.galleryDB
@@ -86,6 +87,7 @@ class SettingsActivity : SimpleActivity() {
         setupSectionColors()
         setupExportSettings()
         setupImportSettings()
+        setupServerUrl()
         invalidateOptionsMenu()
     }
 
@@ -820,4 +822,14 @@ class SettingsActivity : SimpleActivity() {
             setupSettingItems()
         }
     }
+
+    private fun setupServerUrl(){
+        settings_server_url_link.text = config.serverUrl
+        settings_server_url_holder.setOnClickListener {
+            ServerUrlDialog(this, config.serverUrl){
+                config.serverUrl = it
+                settings_server_url_link.text = config.serverUrl
+            }
+      }
+ }
 }

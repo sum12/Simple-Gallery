@@ -215,3 +215,4 @@ const val LOW_TILE_DPI = 160
 const val NORMAL_TILE_DPI = 220
 const val WEIRD_TILE_DPI = 240
 const val HIGH_TILE_DPI = 280
+const val SERVER_URL = "server_url"

@@ -1374,5 +1374,39 @@
                 android:text="@string/import_settings"/>
 
         </RelativeLayout>
+        <RelativeLayout
+            android:id="@+id/settings_server_url_holder"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/medium_margin"
+            android:background="?attr/selectableItemBackground"
+            android:paddingLeft="@dimen/normal_margin"
+            android:paddingTop="@dimen/bigger_margin"
+            android:paddingRight="@dimen/normal_margin"
+            android:paddingBottom="@dimen/bigger_margin">
+
+            <com.simplemobiletools.commons.views.MyTextView
+                android:id="@+id/settings_sever_url_label"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_centerVertical="true"
+                android:layout_toStartOf="@+id/settings_server_url_link"
+                android:layout_toLeftOf="@+id/settings_server_url_link"
+                android:paddingLeft="@dimen/medium_margin"
+                android:paddingRight="@dimen/medium_margin"
+                android:text="@string/server_url"/>
+
+            <com.simplemobiletools.commons.views.MyTextView
+                android:id="@+id/settings_server_url_link"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_alignParentEnd="true"
+                android:layout_alignParentRight="true"
+                android:layout_marginEnd="@dimen/small_margin"
+                android:layout_marginRight="@dimen/small_margin"
+                android:background="@null"
+                android:clickable="false"/>
+        </RelativeLayout>
+
     </LinearLayout>
 </ScrollView>

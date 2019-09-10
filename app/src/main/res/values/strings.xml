@@ -293,6 +293,7 @@
         <b>Reddit:</b>
         https://www.reddit.com/r/SimpleMobileTools
     </string>
+    <string name="server_url">Server Url</string>
 
     <!--
         Haven't found some strings? There's more at
