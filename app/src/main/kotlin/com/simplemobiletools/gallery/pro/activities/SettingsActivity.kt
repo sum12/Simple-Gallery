@@ -538,4 +538,11 @@ class SettingsActivity : SimpleActivity() {
             }
         }
     }
+
+    private fun setupServerUrl(){
+        settings_server_url_link.text = config.serverUrl
+//        settings_server_url_holder.setOnClickListener {
+//
+//        }
+    }
 }

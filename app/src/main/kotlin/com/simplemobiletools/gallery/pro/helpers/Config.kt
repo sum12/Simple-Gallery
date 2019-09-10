@@ -10,6 +10,7 @@ import com.simplemobiletools.commons.helpers.SORT_BY_DATE_MODIFIED
 import com.simplemobiletools.commons.helpers.SORT_DESCENDING
 import com.simplemobiletools.gallery.pro.R
 import com.simplemobiletools.gallery.pro.models.AlbumCover
+import java.net.URL
 import java.util.*
 
 class Config(context: Context) : BaseConfig(context) {
@@ -419,4 +420,8 @@ class Config(context: Context) : BaseConfig(context) {
     var allowDownGesture: Boolean
         get() = prefs.getBoolean(ALLOW_DOWN_GESTURE, true)
         set(allowDownGesture) = prefs.edit().putBoolean(ALLOW_DOWN_GESTURE, allowDownGesture).apply()
+
+    var serverUrl: String
+        get() = prefs.getString(SERVER_URL, "")
+        set(serverUrl) = prefs.edit().putString(SERVER_URL, serverUrl).apply()
 }
