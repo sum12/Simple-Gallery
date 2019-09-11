@@ -1,7 +1,5 @@
 package com.simplemobiletools.gallery.pro.interfaces
 
-import com.google.gson.Gson
-import com.google.gson.GsonBuilder
 import com.simplemobiletools.gallery.pro.models.Medium
 import okhttp3.*
 
@@ -35,19 +33,18 @@ class ServerDao(var serverrul : String){
         Retrofit.Builder().baseUrl(serverrul).addConverterFactory(GsonConverterFactory.create()).client(client).build().create(Service::class.java)
     }
 
-    fun upload(media: Medium){
+    fun upload(media: Medium, album_path: String){
         val file = File(media.path)
         val fileReqBody = RequestBody.create(MediaType.parse("image/*"), file)
         val pic = MultipartBody.Part.createFormData("pic", file.name, fileReqBody)
-        val album_path = RequestBody.create(MediaType.parse("text/plain"), media.parentPath)
+        val album_path = RequestBody.create(MediaType.parse("text/plain"), album_path)
 
         class BaseResponseCallback : Callback<BaseResponse> {
             override fun onFailure(call: Call<BaseResponse>, t: Throwable) {
-                //TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
+                throw t
             }
 
             override fun onResponse(call: Call<BaseResponse>, response: Response<BaseResponse>) {
-                //TODO("not implemented") //To change body of created functions use File | Settings | File Templates.
             }
 
         }
@@ -59,6 +56,6 @@ class ServerDao(var serverrul : String){
 
 interface Service {
     @Multipart
-    @POST("/upload")
+    @POST("upload")
     fun upload(@Part pic: MultipartBody.Part, @Part("album_path") album_path: RequestBody): Call<BaseResponse>
-}   
+}

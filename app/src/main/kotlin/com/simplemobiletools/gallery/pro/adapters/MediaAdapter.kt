@@ -18,6 +18,7 @@ import com.simplemobiletools.commons.models.FileDirItem
 import com.simplemobiletools.commons.views.FastScroller
 import com.simplemobiletools.commons.views.MyRecyclerView
 import com.simplemobiletools.gallery.pro.R
+import com.simplemobiletools.gallery.pro.asynctasks.BackgroudUpload
 import com.simplemobiletools.gallery.pro.dialogs.DeleteWithRememberDialog
 import com.simplemobiletools.gallery.pro.extensions.*
 import com.simplemobiletools.gallery.pro.helpers.SHOW_ALL
@@ -25,6 +26,7 @@ import com.simplemobiletools.gallery.pro.helpers.TYPE_GIFS
 import com.simplemobiletools.gallery.pro.helpers.TYPE_RAWS
 import com.simplemobiletools.gallery.pro.helpers.VIEW_TYPE_LIST
 import com.simplemobiletools.gallery.pro.interfaces.MediaOperationsListener
+import com.simplemobiletools.gallery.pro.interfaces.ServerDao
 import com.simplemobiletools.gallery.pro.models.Medium
 import com.simplemobiletools.gallery.pro.models.ThumbnailItem
 import com.simplemobiletools.gallery.pro.models.ThumbnailSection
@@ -153,6 +155,7 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
             R.id.cab_fix_date_taken -> fixDateTaken()
             R.id.cab_set_as -> setAs()
             R.id.cab_delete -> checkDeleteConfirmation()
+            R.id.cab_upload-> upload()
         }
     }
 
@@ -511,5 +514,10 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
             thumbnail_section.text = section.title
             thumbnail_section.setTextColor(textColor)
         }
+    }
+
+
+    private fun upload() {
+        BackgroudUpload(activity, ServerDao(config.serverUrl)).execute(Pair(getSelectedItems(), path.substringAfterLast("/")))
     }
 }

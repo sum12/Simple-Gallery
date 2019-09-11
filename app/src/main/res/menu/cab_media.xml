@@ -97,4 +97,8 @@
         android:id="@+id/cab_move_to"
         android:title="@string/move_to"
         app:showAsAction="never"/>
+    <item
+        android:id="@+id/cab_upload"
+        android:title="@string/upload"
+        app:showAsAction="never"/>
 </menu>
