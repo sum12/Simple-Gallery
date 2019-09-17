@@ -13,8 +13,12 @@ import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import retrofit2.Callback
 import com.google.gson.annotations.SerializedName
+import com.simplemobiletools.commons.activities.BaseSimpleActivity
+import com.simplemobiletools.gallery.pro.extensions.config
 import retrofit2.Response
 import retrofit2.converter.gson.GsonConverterFactory
+import retrofit2.http.GET
+
 
 
 class BaseResponse {
@@ -27,10 +31,13 @@ class BaseResponse {
 }
 
 
-class ServerDao(var serverrul : String){
-    private val photfloat : Service by lazy {
-        val client = OkHttpClient.Builder().build()
-        Retrofit.Builder().baseUrl(serverrul).addConverterFactory(GsonConverterFactory.create()).client(client).build().create(Service::class.java)
+class ServerDao{
+
+    companion object (activtiy: BaseSimpleActivity){
+        private val photfloat : Service by lazy {
+            val client = OkHttpClient.Builder().build()
+            Retrofit.Builder().baseUrl(activtiy.config.serverUrl).addConverterFactory(GsonConverterFactory.create()).client(client).build().create(Service::class.java)
+        }
     }
 
     fun upload(media: Medium, album_path: String){
@@ -49,7 +56,7 @@ class ServerDao(var serverrul : String){
 
         }
 
-        this.photfloat.upload(pic, album_path).enqueue(BaseResponseCallback())
+        photfloat.upload(pic, album_path).enqueue(BaseResponseCallback())
     }
 }
 
@@ -58,4 +65,11 @@ interface Service {
     @Multipart
     @POST("upload")
     fun upload(@Part pic: MultipartBody.Part, @Part("album_path") album_path: RequestBody): Call<BaseResponse>
+
+    @GET("cache/")
+    fun download(@Part pic: MultipartBody.Part, @Part("album_path") album_path: RequestBody): Call<BaseResponse>
+
+    @POST("scan")
+    fun scan(): Call<BaseResponse>
+
 }

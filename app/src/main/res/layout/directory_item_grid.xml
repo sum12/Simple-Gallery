@@ -43,6 +43,19 @@
         android:visibility="gone"/>
 
     <ImageView
+        android:id="@+id/dir_upload"
+        android:layout_width="@dimen/selection_check_size"
+        android:layout_height="@dimen/selection_check_size"
+        android:layout_alignEnd="@+id/dir_shadow_holder"
+        android:layout_below="@id/dir_check"
+        android:layout_margin="@dimen/small_margin"
+        android:background="@drawable/circle_background"
+        android:contentDescription="@null"
+        android:padding="@dimen/tiny_margin"
+        android:src="@drawable/ic_cloud_circle_black_24dp"
+        android:visibility="visible"/>
+
+    <ImageView
         android:id="@+id/dir_pin"
         android:layout_width="@dimen/selection_check_size"
         android:layout_height="@dimen/selection_check_size"

@@ -8,6 +8,7 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.simplemobiletools.gallery.pro.interfaces.DirectoryDao
 import com.simplemobiletools.gallery.pro.interfaces.MediumDao
+import com.simplemobiletools.gallery.pro.interfaces.ServerDao
 import com.simplemobiletools.gallery.pro.interfaces.WidgetsDao
 import com.simplemobiletools.gallery.pro.models.Directory
 import com.simplemobiletools.gallery.pro.models.Medium
@@ -21,6 +22,8 @@ abstract class GalleryDatabase : RoomDatabase() {
     abstract fun MediumDao(): MediumDao
 
     abstract fun WidgetsDao(): WidgetsDao
+
+    abstract fun ServerDao(): ServerDao
 
     companion object {
         private var db: GalleryDatabase? = null

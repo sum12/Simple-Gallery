@@ -29,8 +29,10 @@ import com.simplemobiletools.gallery.pro.dialogs.PickMediumDialog
 import com.simplemobiletools.gallery.pro.extensions.*
 import com.simplemobiletools.gallery.pro.helpers.*
 import com.simplemobiletools.gallery.pro.interfaces.DirectoryOperationsListener
+import com.simplemobiletools.gallery.pro.interfaces.ServerDao
 import com.simplemobiletools.gallery.pro.models.AlbumCover
 import com.simplemobiletools.gallery.pro.models.Directory
+import kotlinx.android.synthetic.main.directory_item_grid.view.*
 import kotlinx.android.synthetic.main.directory_item_grid.view.dir_check
 import kotlinx.android.synthetic.main.directory_item_grid.view.dir_location
 import kotlinx.android.synthetic.main.directory_item_grid.view.dir_lock
@@ -689,6 +691,7 @@ class DirectoryAdapter(activity: BaseSimpleActivity, var dirs: ArrayList<Directo
                 dir_location.setImageResource(if (directory.location == LOCATION_SD) R.drawable.ic_sd_card_vector else R.drawable.ic_usb_vector)
             }
 
+            dir_upload.beVisibleIf(ServerDao().rootIsFolerUpdated(directory.name))
             photo_cnt.beVisibleIf(showMediaCount)
 
             if (isListViewType) {

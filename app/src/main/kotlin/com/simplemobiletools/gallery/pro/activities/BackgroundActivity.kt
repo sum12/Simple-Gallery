@@ -41,7 +41,6 @@ import com.simplemobiletools.gallery.pro.helpers.*
 import com.simplemobiletools.gallery.pro.interfaces.DirectoryDao
 import com.simplemobiletools.gallery.pro.interfaces.MediaOperationsListener
 import com.simplemobiletools.gallery.pro.interfaces.MediumDao
-import com.simplemobiletools.gallery.pro.interfaces.ServerDao
 import com.simplemobiletools.gallery.pro.models.Medium
 import com.simplemobiletools.gallery.pro.models.ThumbnailItem
 import com.simplemobiletools.gallery.pro.models.ThumbnailSection
@@ -50,7 +49,7 @@ import java.io.File
 import java.io.IOException
 import java.util.*
 
-class MediaActivity : SimpleActivity(), MediaOperationsListener {
+class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
     private val LAST_MEDIA_CHECK_PERIOD = 3000L
 
     private var mPath = ""
@@ -60,7 +59,7 @@ class MediaActivity : SimpleActivity(), MediaOperationsListener {
     private var mIsGettingMedia = false
     private var mAllowPickingMultiple = false
     private var mShowAll = false
-    private var mLoadedInitialPhotos = false
+    private var mLoadedInitialPhotos = true
     private var mIsSearchOpen = false
     private var mLatestMediaId = 0L
     private var mLatestMediaDateId = 0L
@@ -80,7 +79,6 @@ class MediaActivity : SimpleActivity(), MediaOperationsListener {
 
     private lateinit var mMediumDao: MediumDao
     private lateinit var mDirectoryDao: DirectoryDao
-    private lateinit var mServerDao: ServerDao
 
     companion object {
         var mMedia = ArrayList<ThumbnailItem>()
@@ -92,7 +90,6 @@ class MediaActivity : SimpleActivity(), MediaOperationsListener {
 
         mMediumDao = galleryDB.MediumDao()
         mDirectoryDao = galleryDB.DirectoryDao()
-        mServerDao = galleryDB.ServerDao()
 
         intent.apply {
             mIsGetImageIntent = getBooleanExtra(GET_IMAGE_INTENT, false)
