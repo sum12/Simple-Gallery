@@ -20,7 +20,6 @@ import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
 
 
-
 class BaseResponse {
 
     @SerializedName("msg")
@@ -31,14 +30,20 @@ class BaseResponse {
 }
 
 
-class ServerDao{
+class ServerDao(val activtiy: BaseSimpleActivity) {
 
-    companion object (activtiy: BaseSimpleActivity){
-        private val photfloat : Service by lazy {
-            val client = OkHttpClient.Builder().build()
-            Retrofit.Builder().baseUrl(activtiy.config.serverUrl).addConverterFactory(GsonConverterFactory.create()).client(client).build().create(Service::class.java)
+    companion object{
+        lateinit var photfloat: Service
+
+        private fun getPhotoFloat(activtiy: BaseSimpleActivity) : Service {
+            if (! ::photfloat.isInitialized) {
+                val client = OkHttpClient.Builder().build()
+                photfloat = Retrofit.Builder().baseUrl(activtiy.config.serverUrl).addConverterFactory(GsonConverterFactory.create()).client(client).build().create(Service::class.java)
+            }
+            return photfloat
         }
     }
+
 
     fun upload(media: Medium, album_path: String){
         val file = File(media.path)
@@ -53,10 +58,8 @@ class ServerDao{
 
             override fun onResponse(call: Call<BaseResponse>, response: Response<BaseResponse>) {
             }
-
         }
-
-        photfloat.upload(pic, album_path).enqueue(BaseResponseCallback())
+        getPhotoFloat(activtiy).upload(pic, album_path).enqueue(BaseResponseCallback())
     }
 }
 
