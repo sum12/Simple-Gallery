@@ -691,7 +691,7 @@ class DirectoryAdapter(activity: BaseSimpleActivity, var dirs: ArrayList<Directo
                 dir_location.setImageResource(if (directory.location == LOCATION_SD) R.drawable.ic_sd_card_vector else R.drawable.ic_usb_vector)
             }
 
-            dir_upload.beVisibleIf(ServerDao().rootIsFolerUpdated(directory.name))
+//            dir_upload.beVisibleIf(ServerDao().rootIsFolerUpdated(directory.name))
             photo_cnt.beVisibleIf(showMediaCount)
 
             if (isListViewType) {

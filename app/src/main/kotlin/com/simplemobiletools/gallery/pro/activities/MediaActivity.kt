@@ -92,7 +92,7 @@ class MediaActivity : SimpleActivity(), MediaOperationsListener {
 
         mMediumDao = galleryDB.MediumDao()
         mDirectoryDao = galleryDB.DirectoryDao()
-        mServerDao = galleryDB.ServerDao()
+        mServerDao = ServerDao(this)
 
         intent.apply {
             mIsGetImageIntent = getBooleanExtra(GET_IMAGE_INTENT, false)

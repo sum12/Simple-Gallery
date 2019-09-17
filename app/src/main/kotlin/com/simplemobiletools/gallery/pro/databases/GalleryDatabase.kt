@@ -23,8 +23,6 @@ abstract class GalleryDatabase : RoomDatabase() {
 
     abstract fun WidgetsDao(): WidgetsDao
 
-    abstract fun ServerDao(): ServerDao
-
     companion object {
         private var db: GalleryDatabase? = null
 
