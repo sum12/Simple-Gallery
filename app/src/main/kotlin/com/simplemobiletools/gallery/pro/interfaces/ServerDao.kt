@@ -1,49 +1,97 @@
 package com.simplemobiletools.gallery.pro.interfaces
 
-import androidx.room.Dao
 import com.simplemobiletools.gallery.pro.models.Medium
 import okhttp3.*
 
 import retrofit2.Retrofit
-import retrofit2.http.Multipart;
-import retrofit2.http.POST;
-import retrofit2.http.Part;
 import java.io.File
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import com.google.gson.annotations.SerializedName
 import com.simplemobiletools.commons.activities.BaseSimpleActivity
+import com.simplemobiletools.commons.extensions.getParentPath
 import com.simplemobiletools.commons.extensions.toast
 import com.simplemobiletools.gallery.pro.extensions.config
 import kotlinx.coroutines.*
 import retrofit2.converter.gson.GsonConverterFactory
-import retrofit2.http.GET
+import retrofit2.http.*
 import java.util.*
+import kotlin.collections.HashMap
 
+
+class CacheResponse {
+    @SerializedName("date")
+    private var date : String? = null
+
+    @SerializedName("path")
+    lateinit var path : String
+
+    @SerializedName("name")
+    lateinit var name : String
+
+    @SerializedName("photos")
+    lateinit var photos : MutableList<CacheResponse>
+
+    @SerializedName("albums")
+    lateinit var albums : MutableList<CacheResponse>
+}
 
 class BaseResponse {
-
     @SerializedName("msg")
     var msg: String? = null
-
-    @SerializedName("status")
-    var status: Int = 0
 }
 
 
 class ServerDao(val activtiy: BaseSimpleActivity) {
 
-    companion object{
+    companion object {
         val uploading : Queue<Medium> = ArrayDeque<Medium>()
         val downloading : Queue<Medium> = ArrayDeque<Medium>()
+        val albumjobs: HashMap<String, Deferred<CacheResponse>> = HashMap()
+
+        private lateinit var _builder : Retrofit.Builder
         lateinit var photfloat: Service
 
-        private fun getPhotoFloat(activtiy: BaseSimpleActivity) : Service {
-            if (! ::photfloat.isInitialized) {
-                val client = OkHttpClient.Builder().build()
-                photfloat = Retrofit.Builder().baseUrl(activtiy.config.serverUrl).addConverterFactory(GsonConverterFactory.create()).client(client).build().create(Service::class.java)
-            }
+        private lateinit var rootjob: Deferred<CacheResponse>
+
+        fun builder(serverUrl:String){
+            if (::_builder.isInitialized)
+                return
+            _builder = Retrofit.Builder().baseUrl(serverUrl)
+        }
+        private fun getPhotoFloat() : Service {
+//            if (! ::photfloat.isInitialized) {
+            val client = OkHttpClient.Builder().build()
+            photfloat = _builder.addConverterFactory(GsonConverterFactory.create()).client(client).build().create(Service::class.java)
+//            }
             return photfloat
+        }
+
+        suspend fun getRoot() : Deferred<CacheResponse> {
+            if (::rootjob.isInitialized){
+                return rootjob
+            }
+            rootjob = CoroutineScope(Dispatchers.IO).async {
+                getPhotoFloat().root()
+            }
+            return rootjob
+        }
+        suspend fun getAlbum(path : String) :Deferred<CacheResponse> {
+            val albumjb = albumjobs.get(path)
+            if (albumjb == null){
+                albumjobs[path] = CoroutineScope(Dispatchers.IO).async {
+                    getPhotoFloat().album(path)
+                }
+            }
+            return albumjobs[path]!!
+        }
+    }
+
+    init {
+        if (activtiy.config.serverUrl == "") {
+            null
+        } else {
+            builder(activtiy.config.serverUrl)
         }
     }
 
@@ -62,21 +110,66 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
     public fun queue_download(q: Queue<Medium>) =  filter_and_queue(q, downloading)
 
 
+    private fun clean(_path:String, withoutslash: Boolean = true) :String{
+        var path = _path
+        if (withoutslash)
+           path = path.replace('/', '-')
+        path = path.replace(" ", "_").replace("(","").
+                replace("&", "").
+                replace(",", "").
+                replace(")", "").
+                replace("#", "").
+                replace("[", "").
+                replace("]", "").
+                replace("\"", "").
+                replace("'", "").
+                replace("_-_", "-").toLowerCase()
+        while (path.indexOf("--") != -1)
+            path = path.replace("--", "-")
+        while (path.indexOf("__") != -1)
+            path = path.replace("__", "_")
+        if (path.length == 0)
+            path = "root.json"
+        return path
+    }
+
+
+    suspend fun isAlbumCached(_subpath : String) : Boolean {
+        val subpath = clean(_subpath)
+        val cached = getRoot().await()
+        return cached.albums.find { it.path == _subpath } != null
+    }
+
+    suspend fun isPhotoCached(path: String, block: () -> Unit ) : Boolean {
+        val albumPath = path.getParentPath().substringAfterLast('/')
+        val name = path.substringAfterLast('/')
+        if (isAlbumCached(albumPath)) {
+            val cached = getRoot().await()
+            val found = clean(cached.albums.find { it.path == albumPath }?.path!!)
+
+            cached.albums.add(getAlbum(found).await())
+            if (albumjobs.get(found)!!.await().photos.find { it.name == name } != null){
+                block()
+            }
+        }
+        return false
+    }
 
     suspend fun upload(){
         CoroutineScope(Dispatchers.IO).launch {
             for (i in uploading) {
 //                if (i == null) return@launch
                 val pair = prepareUpload(i, i.parentPath.substringAfterLast('/'))
-                val response = getPhotoFloat(activtiy).upload(pair.first, pair.second)
+                val response = getPhotoFloat().upload(pair.first, pair.second)
                 withContext(Dispatchers.Main) {
-                    if (response.status >= 200) {
+                    if (response.hashCode() >= 200) {
                         uploading.remove(i)
                     } else {
-                        activtiy.toast(i.name + " Failed")
+                        activtiy.toast(i.name + " Failed" + response.msg+" " + response.hashCode())
                     }
                 }
             }
+            getPhotoFloat().scan()
         }
     }
 }
@@ -87,8 +180,11 @@ interface Service {
     @POST("upload")
     suspend fun upload(@Part pic: MultipartBody.Part, @Part("album_path") album_path: RequestBody): BaseResponse
 
-    @GET("cache/")
-    suspend fun download(@Part pic: MultipartBody.Part, @Part("album_path") album_path: RequestBody): BaseResponse
+    @GET("cache/{album_path}.json")
+    suspend fun album(@Path("album_path") album_path: String): CacheResponse
+
+    @GET("cache/root.json")
+    suspend fun root(): CacheResponse
 
     @POST("scan")
     suspend fun scan(): BaseResponse

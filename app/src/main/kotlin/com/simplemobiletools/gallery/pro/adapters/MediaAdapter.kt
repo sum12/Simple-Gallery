@@ -6,6 +6,7 @@ import android.view.Menu
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import com.bumptech.glide.Glide
 import com.simplemobiletools.commons.activities.BaseSimpleActivity
 import com.simplemobiletools.commons.adapters.MyRecyclerViewAdapter
@@ -479,7 +480,11 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
             medium_name.beVisibleIf(displayFilenames || isListViewType)
             medium_name.text = medium.name
             medium_name.tag = medium.path
-
+            CoroutineScope(Dispatchers.Main).async {
+                ServerDao(activity).isPhotoCached(medium.path) {
+                    medium_name.setTextColor(context.resources.getColor(R.color.md_red_500_dark))
+                }
+            }
             val showVideoDuration = medium.isVideo() && config.showThumbnailVideoDuration
             if (showVideoDuration) {
                 video_duration.text = medium.videoDuration.getFormattedDuration()
@@ -520,10 +525,13 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
     }
 
 
+    private fun download(){
+
+    }
     private fun upload() {
         val dao = ServerDao(activity)
         dao.queue_upload(ArrayDeque<Medium>(getSelectedItems()))
-        CoroutineScope(Dispatchers.Main).async(){
+        CoroutineScope(Dispatchers.Main).async{
             dao.upload()
         }
     }
