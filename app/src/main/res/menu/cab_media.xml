@@ -101,4 +101,8 @@
         android:id="@+id/cab_upload"
         android:title="@string/upload"
         app:showAsAction="never"/>
+    <item
+        android:id="@+id/cab_download"
+        android:title="@string/download"
+        app:showAsAction="never"/>
 </menu>

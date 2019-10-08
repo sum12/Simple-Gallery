@@ -1,5 +1,6 @@
 package com.simplemobiletools.gallery.pro.adapters
 
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import android.view.Menu
@@ -7,6 +8,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import androidx.core.content.ContextCompat.startActivity
 import com.bumptech.glide.Glide
 import com.simplemobiletools.commons.activities.BaseSimpleActivity
 import com.simplemobiletools.commons.adapters.MyRecyclerViewAdapter
@@ -19,12 +21,10 @@ import com.simplemobiletools.commons.models.FileDirItem
 import com.simplemobiletools.commons.views.FastScroller
 import com.simplemobiletools.commons.views.MyRecyclerView
 import com.simplemobiletools.gallery.pro.R
+import com.simplemobiletools.gallery.pro.activities.BackgroundActivity
 import com.simplemobiletools.gallery.pro.dialogs.DeleteWithRememberDialog
 import com.simplemobiletools.gallery.pro.extensions.*
-import com.simplemobiletools.gallery.pro.helpers.SHOW_ALL
-import com.simplemobiletools.gallery.pro.helpers.TYPE_GIFS
-import com.simplemobiletools.gallery.pro.helpers.TYPE_RAWS
-import com.simplemobiletools.gallery.pro.helpers.VIEW_TYPE_LIST
+import com.simplemobiletools.gallery.pro.helpers.*
 import com.simplemobiletools.gallery.pro.interfaces.MediaOperationsListener
 import com.simplemobiletools.gallery.pro.interfaces.ServerDao
 import com.simplemobiletools.gallery.pro.models.Medium
@@ -160,6 +160,7 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
             R.id.cab_set_as -> setAs()
             R.id.cab_delete -> checkDeleteConfirmation()
             R.id.cab_upload-> upload()
+            R.id.cab_download-> download()
         }
     }
 
@@ -526,13 +527,24 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
 
 
     private fun download(){
-
+        val dao = ServerDao(activity)
+        dao.queue_download(ArrayDeque<Medium>(getSelectedItems()))
+        CoroutineScope(Dispatchers.Main).async{
+            dao.download()
+        }
+        activity.startActivity(Intent(activity, BackgroundActivity::class.java).apply{
+            putExtra(GET_BACKGROUND_INTENT,"download")
+        })
     }
+
     private fun upload() {
         val dao = ServerDao(activity)
         dao.queue_upload(ArrayDeque<Medium>(getSelectedItems()))
         CoroutineScope(Dispatchers.Main).async{
             dao.upload()
         }
+        activity.startActivity(Intent(activity, BackgroundActivity::class.java ).apply{
+            putExtra(GET_BACKGROUND_INTENT,"upload")
+        })
     }
 }

@@ -1,18 +1,22 @@
 package com.simplemobiletools.gallery.pro.activities
 
+import android.annotation.TargetApi
 import android.app.Activity
 import android.app.SearchManager
 import android.app.WallpaperManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.media.ExifInterface
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.view.Menu
 import android.view.MenuItem
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import androidx.annotation.RequiresApi
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.MenuItemCompat
 import androidx.recyclerview.widget.GridLayoutManager
@@ -24,10 +28,7 @@ import com.bumptech.glide.request.transition.Transition
 import com.simplemobiletools.commons.dialogs.ConfirmationDialog
 import com.simplemobiletools.commons.dialogs.CreateNewFolderDialog
 import com.simplemobiletools.commons.extensions.*
-import com.simplemobiletools.commons.helpers.PERMISSION_WRITE_STORAGE
-import com.simplemobiletools.commons.helpers.REQUEST_EDIT_IMAGE
-import com.simplemobiletools.commons.helpers.SORT_BY_RANDOM
-import com.simplemobiletools.commons.helpers.ensureBackgroundThread
+import com.simplemobiletools.commons.helpers.*
 import com.simplemobiletools.commons.models.FileDirItem
 import com.simplemobiletools.commons.views.MyGridLayoutManager
 import com.simplemobiletools.commons.views.MyRecyclerView
@@ -41,15 +42,22 @@ import com.simplemobiletools.gallery.pro.helpers.*
 import com.simplemobiletools.gallery.pro.interfaces.DirectoryDao
 import com.simplemobiletools.gallery.pro.interfaces.MediaOperationsListener
 import com.simplemobiletools.gallery.pro.interfaces.MediumDao
+import com.simplemobiletools.gallery.pro.interfaces.ServerDao
 import com.simplemobiletools.gallery.pro.models.Medium
 import com.simplemobiletools.gallery.pro.models.ThumbnailItem
 import com.simplemobiletools.gallery.pro.models.ThumbnailSection
 import kotlinx.android.synthetic.main.activity_media.*
 import java.io.File
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
 import java.util.*
 
 class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
+    private var mIsUploadIntent: Boolean = false
+    private var mIsDownloadCachedIntent: Boolean = false
+    private var mIsDownloadIntent: Boolean =  false
+    private var mBackgroundType: String = ""
     private val LAST_MEDIA_CHECK_PERIOD = 3000L
 
     private var mPath = ""
@@ -79,6 +87,7 @@ class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
 
     private lateinit var mMediumDao: MediumDao
     private lateinit var mDirectoryDao: DirectoryDao
+    private lateinit var mServerDao: ServerDao
 
     companion object {
         var mMedia = ArrayList<ThumbnailItem>()
@@ -90,17 +99,21 @@ class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
 
         mMediumDao = galleryDB.MediumDao()
         mDirectoryDao = galleryDB.DirectoryDao()
+        mServerDao = ServerDao(this)
 
         intent.apply {
             mIsGetImageIntent = getBooleanExtra(GET_IMAGE_INTENT, false)
             mIsGetVideoIntent = getBooleanExtra(GET_VIDEO_INTENT, false)
             mIsGetAnyIntent = getBooleanExtra(GET_ANY_INTENT, false)
             mAllowPickingMultiple = getBooleanExtra(Intent.EXTRA_ALLOW_MULTIPLE, false)
+            mIsDownloadIntent = getBooleanExtra(GET_DOWNLOAD_INTENT,  false)
+            mIsDownloadCachedIntent = getBooleanExtra(GET_DOWNLOADCACHED_INTENT,  false)
+            mIsUploadIntent = getBooleanExtra(GET_UPLOAD_INTENT,  false)
         }
 
         media_refresh_layout.setOnRefreshListener { getMedia() }
         try {
-            mPath = intent.getStringExtra(DIRECTORY)
+            mBackgroundType = intent.getStringExtra(GET_BACKGROUND_INTENT)
         } catch (e: Exception) {
             showErrorToast(e)
             finish()
@@ -580,42 +593,14 @@ class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
         }
 
         mIsGettingMedia = true
-        if (mLoadedInitialPhotos) {
-            startAsyncTask()
-        } else {
-            getCachedMedia(mPath, mIsGetVideoIntent, mIsGetImageIntent, mMediumDao) {
-                if (it.isEmpty()) {
-                    runOnUiThread {
-                        media_refresh_layout.isRefreshing = true
-                    }
-                } else {
-                    gotMedia(it, true)
-                }
-                startAsyncTask()
-            }
-        }
+        if (mBackgroundType.contains("down"))
+            gotMedia((ServerDao.Companion.downloading as ArrayList<ThumbnailItem>),true)
+        else
+            gotMedia((ServerDao.Companion.uploading as ArrayList<ThumbnailItem>),true)
 
         mLoadedInitialPhotos = true
-    }
+      }
 
-    private fun startAsyncTask() {
-        mCurrAsyncTask?.stopFetching()
-        mCurrAsyncTask = GetMediaAsynctask(applicationContext, mPath, mIsGetImageIntent, mIsGetVideoIntent, mShowAll) {
-            ensureBackgroundThread {
-                val oldMedia = mMedia.clone() as ArrayList<ThumbnailItem>
-                val newMedia = it
-                gotMedia(newMedia, false)
-                try {
-                    oldMedia.filter { !newMedia.contains(it) }.mapNotNull { it as? Medium }.filter { !File(it.path).exists() }.forEach {
-                        mMediumDao.deleteMediumPath(it.path)
-                    }
-                } catch (e: Exception) {
-                }
-            }
-        }
-
-        mCurrAsyncTask!!.execute()
-    }
 
     private fun isDirEmpty(): Boolean {
         return if (mMedia.size <= 0 && config.filterMedia > 0) {
@@ -950,5 +935,70 @@ class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
             setResult(Activity.RESULT_OK, this)
         }
         finish()
+    }
+
+
+    private fun saveBitmapToFile(bitmap: Bitmap, path: String, showSavingToast: Boolean) {
+        try {
+            ensureBackgroundThread {
+                val file = File(path)
+                val fileDirItem = FileDirItem(path, path.getFilenameFromPath())
+                getFileOutputStream(fileDirItem, true) {
+                    if (it != null) {
+                        saveBitmap(file, bitmap, it, showSavingToast)
+                    } else {
+                        toast(com.simplemobiletools.gallery.pro.R.string.image_editing_failed)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            showErrorToast(e)
+        } catch (e: OutOfMemoryError) {
+            toast(com.simplemobiletools.gallery.pro.R.string.out_of_memory_error)
+        }
+    }
+
+    @TargetApi(Build.VERSION_CODES.N)
+    private fun saveBitmap(file: File, bitmap: Bitmap, out: OutputStream, showSavingToast: Boolean) {
+        var oldExif: ExifInterface? = null
+        if (showSavingToast) {
+            toast(com.simplemobiletools.gallery.pro.R.string.saving)
+        }
+
+
+        var inputStream: InputStream? = null
+        try {
+            if (isNougatPlus()) {
+                inputStream = contentResolver.openInputStream(Uri.fromFile(file))
+                oldExif = ExifInterface(inputStream)
+            }
+        } catch (e: Exception) {
+        } finally {
+            inputStream?.close()
+        }
+
+        bitmap.compress(file.absolutePath.getCompressionFormat(), 100, out)
+
+        try {
+            if (isNougatPlus()) {
+                val newExif = ExifInterface(file.absolutePath)
+                oldExif?.copyTo(newExif, false)
+            }
+        } catch (e: Exception) {
+        }
+
+        setResult(Activity.RESULT_OK, intent)
+        scanFinalPath(file.absolutePath)
+        out.close()
+    }
+
+    private fun scanFinalPath(path: String) {
+        val paths = arrayListOf(path)
+        rescanPaths(paths) {
+            fixDateTaken(paths, false)
+            setResult(Activity.RESULT_OK, intent)
+            toast(R.string.file_saved)
+            finish()
+        }
     }
 }
