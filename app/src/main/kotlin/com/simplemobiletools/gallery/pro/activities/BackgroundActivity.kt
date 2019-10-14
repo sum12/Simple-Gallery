@@ -593,11 +593,11 @@ class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
         }
 
         mIsGettingMedia = true
-        if (mBackgroundType.contains("down"))
-            gotMedia((ServerDao.Companion.downloading as ArrayList<ThumbnailItem>),true)
-        else
-            gotMedia((ServerDao.Companion.uploading as ArrayList<ThumbnailItem>),true)
-
+        if (mBackgroundType.contains("down")) {
+            gotMedia(ArrayList<ThumbnailItem>(ServerDao.downloading.toList()), true)
+        }else {
+            gotMedia(ArrayList<ThumbnailItem>(ServerDao.uploading.toList()), true)
+        }
         mLoadedInitialPhotos = true
       }
 
@@ -779,8 +779,6 @@ class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
         measureRecyclerViewContent(mMedia)
     }
 
-    private fun isSetWallpaperIntent() = intent.getBooleanExtra(SET_WALLPAPER_INTENT, false)
-
     override fun onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
         if (requestCode == REQUEST_EDIT_IMAGE) {
             if (resultCode == Activity.RESULT_OK && resultData != null) {
@@ -792,33 +790,7 @@ class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
     }
 
     private fun itemClicked(path: String) {
-        if (isSetWallpaperIntent()) {
-            toast(R.string.setting_wallpaper)
-
-            val wantedWidth = wallpaperDesiredMinimumWidth
-            val wantedHeight = wallpaperDesiredMinimumHeight
-            val ratio = wantedWidth.toFloat() / wantedHeight
-
-            val options = RequestOptions()
-                    .override((wantedWidth * ratio).toInt(), wantedHeight)
-                    .fitCenter()
-
-            Glide.with(this)
-                    .asBitmap()
-                    .load(File(path))
-                    .apply(options)
-                    .into(object : SimpleTarget<Bitmap>() {
-                        override fun onResourceReady(resource: Bitmap, transition: Transition<in Bitmap>?) {
-                            try {
-                                WallpaperManager.getInstance(applicationContext).setBitmap(resource)
-                                setResult(Activity.RESULT_OK)
-                            } catch (ignored: IOException) {
-                            }
-
-                            finish()
-                        }
-                    })
-        } else if (mIsGetImageIntent || mIsGetVideoIntent || mIsGetAnyIntent) {
+        if (mIsGetImageIntent || mIsGetVideoIntent || mIsGetAnyIntent) {
             Intent().apply {
                 data = Uri.parse(path)
                 setResult(Activity.RESULT_OK, this)

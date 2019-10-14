@@ -62,6 +62,10 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
     private var displayFilenames = config.displayFileNames
     private var showFileTypes = config.showThumbnailFileTypes
 
+    private val mServerDao by lazy {
+        ServerDao(activity)
+    }
+
     init {
         setupDragListener(true)
         enableInstantLoad()
@@ -482,7 +486,7 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
             medium_name.text = medium.name
             medium_name.tag = medium.path
             CoroutineScope(Dispatchers.Main).async {
-                ServerDao(activity).isPhotoCached(medium.path) {
+                ServerDao.isPhotoCached(medium.path) {
                     medium_name.setTextColor(context.resources.getColor(R.color.md_red_500_dark))
                 }
             }
@@ -527,10 +531,9 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
 
 
     private fun download(){
-        val dao = ServerDao(activity)
-        dao.queue_download(ArrayDeque<Medium>(getSelectedItems()))
+        ServerDao.queue_download(getSelectedItems())
         CoroutineScope(Dispatchers.Main).async{
-            dao.download()
+            mServerDao.download()
         }
         activity.startActivity(Intent(activity, BackgroundActivity::class.java).apply{
             putExtra(GET_BACKGROUND_INTENT,"download")
@@ -538,10 +541,9 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
     }
 
     private fun upload() {
-        val dao = ServerDao(activity)
-        dao.queue_upload(ArrayDeque<Medium>(getSelectedItems()))
+        ServerDao.queue_upload(getSelectedItems())
         CoroutineScope(Dispatchers.Main).async{
-            dao.upload()
+            mServerDao.upload()
         }
         activity.startActivity(Intent(activity, BackgroundActivity::class.java ).apply{
             putExtra(GET_BACKGROUND_INTENT,"upload")

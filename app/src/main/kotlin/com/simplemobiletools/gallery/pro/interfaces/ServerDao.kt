@@ -1,10 +1,5 @@
 package com.simplemobiletools.gallery.pro.interfaces
 
-import android.annotation.TargetApi
-import android.app.Activity
-import android.graphics.Bitmap
-import android.media.ExifInterface
-import android.os.Build
 import com.simplemobiletools.gallery.pro.models.Medium
 import okhttp3.*
 
@@ -13,19 +8,16 @@ import java.io.File
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import com.google.gson.annotations.SerializedName
-import com.simplemobiletools.commons.R
 import com.simplemobiletools.commons.activities.BaseSimpleActivity
-import com.simplemobiletools.commons.dialogs.ConfirmationDialog
 import com.simplemobiletools.commons.extensions.*
-import com.simplemobiletools.commons.helpers.ensureBackgroundThread
-import com.simplemobiletools.commons.helpers.isNougatPlus
-import com.simplemobiletools.commons.models.FileDirItem
 import com.simplemobiletools.gallery.pro.extensions.config
 import kotlinx.coroutines.*
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
-import java.io.OutputStream
 import java.util.*
+import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.logging.Logger
+import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
 
 
@@ -54,10 +46,20 @@ class BaseResponse {
 
 class ServerDao(val activtiy: BaseSimpleActivity) {
 
+
+    init {
+        if (activtiy.config.serverUrl == "") {
+            null
+        } else {
+            builder(activtiy.config.serverUrl)
+        }
+    }
+
     companion object {
-        val uploading : Queue<Medium> = ArrayDeque<Medium>()
-        val downloading : Queue<Medium> = ArrayDeque<Medium>()
-        val downloadingCached : Queue<Medium> = ArrayDeque<Medium>()
+        var taskrunning = false
+        val uploading = ConcurrentLinkedQueue<Medium>()
+        val downloading = ConcurrentLinkedQueue<Medium>()
+        val downloadingCached = ConcurrentLinkedQueue<Medium>()
         val albumjobs: HashMap<String, Deferred<CacheResponse>> = HashMap()
 
         private lateinit var _builder : Retrofit.Builder
@@ -96,50 +98,64 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
             }
             return albumjobs[path]!!
         }
-    }
 
-    init {
-        if (activtiy.config.serverUrl == "") {
-            null
-        } else {
-            builder(activtiy.config.serverUrl)
+        private fun filter_and_queue (from: ArrayList<Medium>, to: Queue<Medium>) = from.filter { photo -> !to.map { p -> p.path }.contains( photo.path) }.map { photo -> to.add(photo) }
+
+//    fun queue_upload(q: Queue<Medium>)   {
+//        uploading.addAll(q.toList())
+//        uploading.forEach {
+//            Logger.getLogger(ServerDao::class.java.name).info(it.name)
+//        }
+//    }
+
+        fun queue_download(q: ArrayList<Medium>) =  filter_and_queue(q, downloading)
+        fun queue_upload(q: ArrayList<Medium>) =  filter_and_queue(q, uploading)
+
+        private fun clean(_path:String, withoutslash: Boolean = true) :String{
+            var path = _path
+            if (withoutslash)
+                path = path.replace('/', '-')
+            path = path.replace(" ", "_").replace("(","").
+                    replace("&", "").
+                    replace(",", "").
+                    replace(")", "").
+                    replace("#", "").
+                    replace("[", "").
+                    replace("]", "").
+                    replace("\"", "").
+                    replace("'", "").
+                    replace("_-_", "-").toLowerCase()
+            while (path.indexOf("--") != -1)
+                path = path.replace("--", "-")
+            while (path.indexOf("__") != -1)
+                path = path.replace("__", "_")
+            if (path.length == 0)
+                path = "root.json"
+            return path
         }
+
+        suspend fun isAlbumCached(_subpath : String) : Boolean {
+            val subpath = clean(_subpath)
+            val cached = getRoot().await()
+            return cached.albums.find { it.path == _subpath } != null
+        }
+
+        suspend fun isPhotoCached(path: String, block: () -> Unit ) : Boolean {
+            val albumPath = path.getParentPath().substringAfterLast('/')
+            val name = path.substringAfterLast('/')
+            if (isAlbumCached(albumPath)) {
+                val cached = getRoot().await()
+                val found = clean(cached.albums.find { it.path == albumPath }?.path!!)
+
+                cached.albums.add(getAlbum(found).await())
+                if (albumjobs.get(found)!!.await().photos.find { it.name == name } != null){
+                    block()
+                }
+            }
+            return false
+        }
+
     }
-
-    private fun filter_and_queue (from :Queue<Medium>, to : Queue<Medium>) = from.filter { photo -> !to.map { p:Medium -> p.path }.contains( photo.path) }.map { photo -> to.add(photo) }
-
-    public fun queue_upload(q: Queue<Medium>) =  filter_and_queue(q, uploading)
-    public fun queue_download(q: Queue<Medium>) =  filter_and_queue(q, downloading)
-
-    private fun handleQueue(res : retrofit2.Response<ResponseBody>, q: Queue<Medium>){
-
-    }
-
-
-
-    private fun clean(_path:String, withoutslash: Boolean = true) :String{
-        var path = _path
-        if (withoutslash)
-           path = path.replace('/', '-')
-        path = path.replace(" ", "_").replace("(","").
-                replace("&", "").
-                replace(",", "").
-                replace(")", "").
-                replace("#", "").
-                replace("[", "").
-                replace("]", "").
-                replace("\"", "").
-                replace("'", "").
-                replace("_-_", "-").toLowerCase()
-        while (path.indexOf("--") != -1)
-            path = path.replace("--", "-")
-        while (path.indexOf("__") != -1)
-            path = path.replace("__", "_")
-        if (path.length == 0)
-            path = "root.json"
-        return path
-    }
-
 
     private fun prepareUpload(media: Medium, album_path: String) : Pair<MultipartBody.Part, RequestBody> {
         val file = File(media.path)
@@ -152,59 +168,53 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
 
     private fun prepareDownload(media: Medium, album_path: String, cached: Boolean) : Pair<String, String> {
         if (cached)
-            return Pair(clean(album_path),clean(media.path))
+            return Pair(clean(album_path),clean(media.path.substringAfter('/')))
         else
-            return Pair(album_path,media.path)
-    }
-
-    suspend fun isAlbumCached(_subpath : String) : Boolean {
-        val subpath = clean(_subpath)
-        val cached = getRoot().await()
-        return cached.albums.find { it.path == _subpath } != null
-    }
-
-    suspend fun isPhotoCached(path: String, block: () -> Unit ) : Boolean {
-        val albumPath = path.getParentPath().substringAfterLast('/')
-        val name = path.substringAfterLast('/')
-        if (isAlbumCached(albumPath)) {
-            val cached = getRoot().await()
-            val found = clean(cached.albums.find { it.path == albumPath }?.path!!)
-
-            cached.albums.add(getAlbum(found).await())
-            if (albumjobs.get(found)!!.await().photos.find { it.name == name } != null){
-                block()
-            }
-        }
-        return false
+            return Pair(album_path,media.path.substringAfterLast('/'))
     }
 
     suspend fun upload(){
+        if (taskrunning){
+            activtiy.toast("Task already running")
+            return
+        }
         CoroutineScope(Dispatchers.IO).launch {
-            for (i in uploading) {
+            taskrunning = true
+//            for (img in uploading.toTypedArray()) {
 //                if (i == null) return@launch
-                val pair = prepareUpload(i, i.parentPath.substringAfterLast('/'))
+            val itr = uploading
+            for (img in itr){
+                itr.remove()
+//                val img = uploading[i]
+                val pair = prepareUpload(img, img.parentPath.substringAfterLast('/'))
                 val response = getPhotoFloat().upload(pair.first, pair.second)
                 withContext(Dispatchers.Main) {
                     if (response.code() >= 200) {
-                        uploading.remove(i)
+                        activtiy.toast(img.name + " - Done ")
                     } else {
-                        activtiy.toast(i.name + " Failed ("+response.code()+"):" + response.errorBody())
+                        activtiy.toast(img.name + " Failed ("+response.code()+"):" + response.errorBody())
                     }
                 }
             }
             getPhotoFloat().scan()
+            taskrunning = false
         }
     }
 
     suspend fun download(cached : Boolean = false){
+        if (taskrunning){
+            activtiy.toast("Task already running")
+            return
+        }
         CoroutineScope(Dispatchers.IO).launch {
+            taskrunning = true
             val currq: Queue<Medium>
             if (cached){
                 currq = downloadingCached
             }else {
                 currq = downloading
             }
-            for (i in currq) {
+            for (i in currq.iterator()) {
                 val pair = prepareDownload(i, i.parentPath.substringAfterLast('/'), cached)
                 var response: retrofit2.Response<ResponseBody>
                 if (cached){
@@ -212,15 +222,13 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
                 }else {
                     response = getPhotoFloat().photoOriginal(pair.first, pair.second)
                 }
-
-                withContext(Dispatchers.Main) {
-                    if (response.code() >= 200) {
-                        currq.remove(i)
-                    } else {
-                        activtiy.toast(i.name + " Failed" + response.errorBody())
-                    }
+                if (response.code() >= 200) {
+                    currq.remove(i)
+                } else {
+                    activtiy.toast(i.name + " Failed" + response.errorBody())
                 }
             }
+            taskrunning = false
         }
     }
 
