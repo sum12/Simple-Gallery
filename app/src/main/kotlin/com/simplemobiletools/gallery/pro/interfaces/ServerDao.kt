@@ -1,5 +1,7 @@
 package com.simplemobiletools.gallery.pro.interfaces
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import com.simplemobiletools.gallery.pro.models.Medium
 import okhttp3.*
 
@@ -14,9 +16,9 @@ import com.simplemobiletools.gallery.pro.extensions.config
 import kotlinx.coroutines.*
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
+import java.io.InputStream
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.logging.Logger
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
 
@@ -63,7 +65,7 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
         val albumjobs: HashMap<String, Deferred<CacheResponse>> = HashMap()
 
         private lateinit var _builder : Retrofit.Builder
-        lateinit var photfloat: Service
+        lateinit var photfloat: PhotoFloatService
 
         private lateinit var rootjob: Deferred<CacheResponse>
 
@@ -72,10 +74,10 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
                 return
             _builder = Retrofit.Builder().baseUrl(serverUrl)
         }
-        private fun getPhotoFloat() : Service {
+        private fun getPhotoFloat() : PhotoFloatService {
 //            if (! ::photfloat.isInitialized) {
             val client = OkHttpClient.Builder().build()
-            photfloat = _builder.addConverterFactory(GsonConverterFactory.create()).client(client).build().create(Service::class.java)
+            photfloat = _builder.addConverterFactory(GsonConverterFactory.create()).client(client).build().create(PhotoFloatService::class.java)
 //            }
             return photfloat
         }
@@ -108,7 +110,7 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
 //        }
 //    }
 
-        fun queue_download(q: ArrayList<Medium>) =  filter_and_queue(q, downloading)
+        fun queue_download(q: ArrayList<Medium>, cached: Boolean) =  filter_and_queue(q, if (cached==false) downloading else downloadingCached)
         fun queue_upload(q: ArrayList<Medium>) =  filter_and_queue(q, uploading)
 
         private fun clean(_path:String, withoutslash: Boolean = true) :String{
@@ -168,9 +170,9 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
 
     private fun prepareDownload(media: Medium, album_path: String, cached: Boolean) : Pair<String, String> {
         if (cached)
-            return Pair(clean(album_path),clean(media.path.substringAfter('/')))
+            return Pair(clean(album_path),clean(media.name+"_1024.jpg"))
         else
-            return Pair(album_path,media.path.substringAfterLast('/'))
+            return Pair(album_path,media.name)
     }
 
     suspend fun upload(){
@@ -180,20 +182,17 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
         }
         CoroutineScope(Dispatchers.IO).launch {
             taskrunning = true
-//            for (img in uploading.toTypedArray()) {
-//                if (i == null) return@launch
-            val itr = uploading
+            val itr = uploading.iterator()
             for (img in itr){
                 itr.remove()
 //                val img = uploading[i]
                 val pair = prepareUpload(img, img.parentPath.substringAfterLast('/'))
                 val response = getPhotoFloat().upload(pair.first, pair.second)
-                withContext(Dispatchers.Main) {
-                    if (response.code() >= 200) {
-                        activtiy.toast(img.name + " - Done ")
-                    } else {
-                        activtiy.toast(img.name + " Failed ("+response.code()+"):" + response.errorBody())
-                    }
+                if (response.code() >= 200) {
+                    activtiy.toast(img.name + " - Done ")
+                } else {
+                    activtiy.toast(img.name + " Failed ("+response.code()+"):" + response.errorBody())
+                    break
                 }
             }
             getPhotoFloat().scan()
@@ -201,7 +200,7 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
         }
     }
 
-    suspend fun download(cached : Boolean = false){
+    suspend fun download(cached: Boolean = false, goodownload: (InputStream, String) -> Unit){
         if (taskrunning){
             activtiy.toast("Task already running")
             return
@@ -223,6 +222,11 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
                     response = getPhotoFloat().photoOriginal(pair.first, pair.second)
                 }
                 if (response.code() >= 200) {
+                    try {
+                        goodownload(response.body()!!.bytes().inputStream(), i.path)
+                    }catch (e: Exception){
+                        break
+                    }
                     currq.remove(i)
                 } else {
                     activtiy.toast(i.name + " Failed" + response.errorBody())
@@ -230,14 +234,15 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
             }
             taskrunning = false
         }
+
     }
-
-
-
 }
 
 
-interface Service {
+
+
+
+interface PhotoFloatService {
     @Multipart
     @POST("upload")
     suspend fun upload(@Part pic: MultipartBody.Part, @Part("album_path") album_path: RequestBody): retrofit2.Response<BaseResponse>

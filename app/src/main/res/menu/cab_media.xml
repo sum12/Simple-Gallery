@@ -78,6 +78,18 @@
         android:title="@string/restore_selected_files"
         app:showAsAction="never"/>
     <item
+        android:id="@+id/cab_upload"
+        android:title="@string/upload"
+        app:showAsAction="never"/>
+    <item
+        android:id="@+id/cab_download"
+        android:title="@string/download"
+        app:showAsAction="never"/>
+    <item
+        android:id="@+id/cab_download_cached"
+        android:title="@string/download_cached"
+        app:showAsAction="never"/>
+    <item
         android:id="@+id/cab_fix_date_taken"
         android:title="@string/fix_date_taken"
         app:showAsAction="never"/>
@@ -96,13 +108,5 @@
     <item
         android:id="@+id/cab_move_to"
         android:title="@string/move_to"
-        app:showAsAction="never"/>
-    <item
-        android:id="@+id/cab_upload"
-        android:title="@string/upload"
-        app:showAsAction="never"/>
-    <item
-        android:id="@+id/cab_download"
-        android:title="@string/download"
         app:showAsAction="never"/>
 </menu>

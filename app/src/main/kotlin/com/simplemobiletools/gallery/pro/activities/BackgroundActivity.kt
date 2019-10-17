@@ -1,30 +1,20 @@
 package com.simplemobiletools.gallery.pro.activities
 
-import android.annotation.TargetApi
 import android.app.Activity
 import android.app.SearchManager
-import android.app.WallpaperManager
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
-import android.media.ExifInterface
 import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.view.Menu
 import android.view.MenuItem
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import androidx.annotation.RequiresApi
 import androidx.appcompat.widget.SearchView
 import androidx.core.view.MenuItemCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.bumptech.glide.Glide
-import com.bumptech.glide.request.RequestOptions
-import com.bumptech.glide.request.target.SimpleTarget
-import com.bumptech.glide.request.transition.Transition
 import com.simplemobiletools.commons.dialogs.ConfirmationDialog
 import com.simplemobiletools.commons.dialogs.CreateNewFolderDialog
 import com.simplemobiletools.commons.extensions.*
@@ -48,9 +38,6 @@ import com.simplemobiletools.gallery.pro.models.ThumbnailItem
 import com.simplemobiletools.gallery.pro.models.ThumbnailSection
 import kotlinx.android.synthetic.main.activity_media.*
 import java.io.File
-import java.io.IOException
-import java.io.InputStream
-import java.io.OutputStream
 import java.util.*
 
 class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
@@ -372,13 +359,13 @@ class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
     private fun tryLoadGallery() {
         handlePermission(PERMISSION_WRITE_STORAGE) {
             if (it) {
-                val dirName = when {
-                    mPath == FAVORITES -> getString(R.string.favorites)
-                    mPath == RECYCLE_BIN -> getString(R.string.recycle_bin)
-                    mPath == config.OTGPath -> getString(R.string.usb)
-                    else -> getHumanizedFilename(mPath)
+                val dirName = when (mBackgroundType){
+                    DOWNLOAD -> getString(R.string.download)
+                    DOWNLOAD_CACHED -> (getString(R.string.download_cached))
+                    UPLOAD -> (getString(R.string.upload))
+                    else -> getString(R.string.background)
                 }
-                updateActionBarTitle(if (mShowAll) resources.getString(R.string.all_folders) else dirName)
+                updateActionBarTitle(dirName)
                 getMedia()
                 setupLayoutManager()
             } else {
@@ -397,15 +384,16 @@ class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
 
         val currAdapter = media_grid.adapter
         if (currAdapter == null) {
-            initZoomListener()
+//            initZoomListener()
             val fastscroller = if (config.scrollHorizontally) media_horizontal_fastscroller else media_vertical_fastscroller
-            MediaAdapter(this, mMedia.clone() as ArrayList<ThumbnailItem>, this, mIsGetImageIntent || mIsGetVideoIntent || mIsGetAnyIntent,
+            MediaAdapter(this, mMedia as ArrayList<ThumbnailItem>, this, mIsGetImageIntent || mIsGetVideoIntent || mIsGetAnyIntent,
                     mAllowPickingMultiple, mPath, media_grid, fastscroller) {
                 if (it is Medium && !isFinishing) {
                     itemClicked(it.path)
                 }
             }.apply {
                 setupZoomListener(mZoomListener)
+                isBackgroundAdapter = true
                 media_grid.adapter = this
             }
             setupLayoutManager()
@@ -655,35 +643,7 @@ class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
     }
 
     private fun setupLayoutManager() {
-        val viewType = config.getFolderViewType(if (mShowAll) SHOW_ALL else mPath)
-        if (viewType == VIEW_TYPE_GRID) {
-            setupGridLayoutManager()
-        } else {
-            setupListLayoutManager()
-        }
-    }
-
-    private fun setupGridLayoutManager() {
-        val layoutManager = media_grid.layoutManager as MyGridLayoutManager
-        if (config.scrollHorizontally) {
-            layoutManager.orientation = RecyclerView.HORIZONTAL
-            media_refresh_layout.layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.MATCH_PARENT)
-        } else {
-            layoutManager.orientation = RecyclerView.VERTICAL
-            media_refresh_layout.layoutParams = FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
-        }
-
-        layoutManager.spanCount = config.mediaColumnCnt
-        val adapter = getMediaAdapter()
-        layoutManager.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
-            override fun getSpanSize(position: Int): Int {
-                return if (adapter?.isASectionTitle(position) == true) {
-                    layoutManager.spanCount
-                } else {
-                    1
-                }
-            }
-        }
+        setupListLayoutManager()
     }
 
     private fun measureRecyclerViewContent(media: ArrayList<ThumbnailItem>) {
@@ -910,67 +870,4 @@ class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
     }
 
 
-    private fun saveBitmapToFile(bitmap: Bitmap, path: String, showSavingToast: Boolean) {
-        try {
-            ensureBackgroundThread {
-                val file = File(path)
-                val fileDirItem = FileDirItem(path, path.getFilenameFromPath())
-                getFileOutputStream(fileDirItem, true) {
-                    if (it != null) {
-                        saveBitmap(file, bitmap, it, showSavingToast)
-                    } else {
-                        toast(com.simplemobiletools.gallery.pro.R.string.image_editing_failed)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            showErrorToast(e)
-        } catch (e: OutOfMemoryError) {
-            toast(com.simplemobiletools.gallery.pro.R.string.out_of_memory_error)
-        }
-    }
-
-    @TargetApi(Build.VERSION_CODES.N)
-    private fun saveBitmap(file: File, bitmap: Bitmap, out: OutputStream, showSavingToast: Boolean) {
-        var oldExif: ExifInterface? = null
-        if (showSavingToast) {
-            toast(com.simplemobiletools.gallery.pro.R.string.saving)
-        }
-
-
-        var inputStream: InputStream? = null
-        try {
-            if (isNougatPlus()) {
-                inputStream = contentResolver.openInputStream(Uri.fromFile(file))
-                oldExif = ExifInterface(inputStream)
-            }
-        } catch (e: Exception) {
-        } finally {
-            inputStream?.close()
-        }
-
-        bitmap.compress(file.absolutePath.getCompressionFormat(), 100, out)
-
-        try {
-            if (isNougatPlus()) {
-                val newExif = ExifInterface(file.absolutePath)
-                oldExif?.copyTo(newExif, false)
-            }
-        } catch (e: Exception) {
-        }
-
-        setResult(Activity.RESULT_OK, intent)
-        scanFinalPath(file.absolutePath)
-        out.close()
-    }
-
-    private fun scanFinalPath(path: String) {
-        val paths = arrayListOf(path)
-        rescanPaths(paths) {
-            fixDateTaken(paths, false)
-            setResult(Activity.RESULT_OK, intent)
-            toast(R.string.file_saved)
-            finish()
-        }
-    }
 }

@@ -1,14 +1,17 @@
 package com.simplemobiletools.gallery.pro.adapters
 
+import android.annotation.TargetApi
 import android.content.Intent
+import android.graphics.Bitmap
+import android.media.ExifInterface
+import android.net.Uri
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.view.Menu
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
-import androidx.core.content.ContextCompat
-import androidx.core.content.ContextCompat.startActivity
 import com.bumptech.glide.Glide
 import com.simplemobiletools.commons.activities.BaseSimpleActivity
 import com.simplemobiletools.commons.adapters.MyRecyclerViewAdapter
@@ -17,6 +20,7 @@ import com.simplemobiletools.commons.dialogs.RenameDialog
 import com.simplemobiletools.commons.dialogs.RenameItemDialog
 import com.simplemobiletools.commons.extensions.*
 import com.simplemobiletools.commons.helpers.ensureBackgroundThread
+import com.simplemobiletools.commons.helpers.isNougatPlus
 import com.simplemobiletools.commons.models.FileDirItem
 import com.simplemobiletools.commons.views.FastScroller
 import com.simplemobiletools.commons.views.MyRecyclerView
@@ -35,7 +39,11 @@ import kotlinx.android.synthetic.main.thumbnail_section.view.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
 import java.util.*
+import java.util.logging.Logger
 
 
 class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<ThumbnailItem>, val listener: MediaOperationsListener?, val isAGetIntent: Boolean,
@@ -49,7 +57,13 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
 
     private val config = activity.config
     private val viewType = config.getFolderViewType(if (config.showAll) SHOW_ALL else path)
-    private val isListViewType = viewType == VIEW_TYPE_LIST
+    private val isListViewType : Boolean
+            get() {
+                if (isBackgroundAdapter)
+                    return true
+                else
+                    return viewType == VIEW_TYPE_LIST
+            }
     private var visibleItemPaths = ArrayList<String>()
     private var rotatedImagePaths = ArrayList<String>()
     private var loadImageInstantly = false
@@ -61,6 +75,8 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
     private var cropThumbnails = config.cropThumbnails
     private var displayFilenames = config.displayFileNames
     private var showFileTypes = config.showThumbnailFileTypes
+
+    var isBackgroundAdapter = false
 
     private val mServerDao by lazy {
         ServerDao(activity)
@@ -86,7 +102,7 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
         return createViewHolder(layoutType, parent)
     }
 
-    override fun onBindViewHolder(holder: MyRecyclerViewAdapter.ViewHolder, position: Int) {
+    override fun onBindViewHolder(holder: ViewHolder, position: Int) {
         val tmbItem = media.getOrNull(position) ?: return
         if (tmbItem is Medium) {
             visibleItemPaths.add(tmbItem.path)
@@ -135,12 +151,38 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
             checkHideBtnVisibility(this, selectedItems)
             checkFavoriteBtnVisibility(this, selectedItems)
         }
+
+        menu.apply {
+            findItem(R.id.cab_rename).isVisible =  !isBackgroundAdapter
+            findItem(R.id.cab_edit).isVisible =  !isBackgroundAdapter
+            findItem(R.id.cab_hide).isVisible = !isBackgroundAdapter
+            findItem(R.id.cab_unhide).isVisible =  !isBackgroundAdapter
+            findItem(R.id.cab_add_to_favorites).isVisible =  !isBackgroundAdapter
+            findItem(R.id.cab_remove_from_favorites).isVisible =  !isBackgroundAdapter
+            findItem(R.id.cab_restore_recycle_bin_files).isVisible = !isBackgroundAdapter
+            findItem(R.id.cab_share).isVisible = !isBackgroundAdapter
+            findItem(R.id.cab_rotate_right).isVisible = !isBackgroundAdapter
+            findItem(R.id.cab_rotate_left).isVisible = !isBackgroundAdapter
+            findItem(R.id.cab_rotate_one_eighty).isVisible= !isBackgroundAdapter
+            findItem(R.id.cab_copy_to).isVisible = !isBackgroundAdapter
+            findItem(R.id.cab_move_to).isVisible = !isBackgroundAdapter
+            findItem(R.id.cab_select_all).isVisible = !isBackgroundAdapter
+            findItem(R.id.cab_open_with).isVisible = !isBackgroundAdapter
+            findItem(R.id.cab_fix_date_taken).isVisible = !isBackgroundAdapter
+            findItem(R.id.cab_set_as).isVisible = !isBackgroundAdapter
+            findItem(R.id.cab_delete).isVisible = !isBackgroundAdapter
+            findItem(R.id.cab_upload).isVisible= !isBackgroundAdapter
+            findItem(R.id.cab_download).isVisible= !isBackgroundAdapter
+            findItem(R.id.cab_download_cached).isVisible= !isBackgroundAdapter
+
+        }
     }
 
     override fun actionItemPressed(id: Int) {
         if (selectedKeys.isEmpty()) {
             return
         }
+ isBackgroundAdapter
 
         when (id) {
             R.id.cab_confirm_selection -> confirmSelection()
@@ -165,6 +207,7 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
             R.id.cab_delete -> checkDeleteConfirmation()
             R.id.cab_upload-> upload()
             R.id.cab_download-> download()
+            R.id.cab_download_cached-> download(cached = true)
         }
     }
 
@@ -530,10 +573,12 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
     }
 
 
-    private fun download(){
-        ServerDao.queue_download(getSelectedItems())
+
+
+    private fun download(cached : Boolean = false){
+        ServerDao.queue_download(getSelectedItems(),cached)
         CoroutineScope(Dispatchers.Main).async{
-            mServerDao.download()
+            mServerDao.download(cached ,{ jpeg, p -> saveBitmapToFile(jpeg, p) } )
         }
         activity.startActivity(Intent(activity, BackgroundActivity::class.java).apply{
             putExtra(GET_BACKGROUND_INTENT,"download")
@@ -548,5 +593,43 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
         activity.startActivity(Intent(activity, BackgroundActivity::class.java ).apply{
             putExtra(GET_BACKGROUND_INTENT,"upload")
         })
+    }
+
+
+    private fun saveBitmapToFile(jpeg: InputStream , path: String) {
+        try {
+            ensureBackgroundThread {
+                val file = File(path)
+                val fileDirItem = FileDirItem(path, path.getFilenameFromPath())
+                activity.getFileOutputStream(fileDirItem, true) {
+                    if (it != null) {
+                        saveBitmap(file, jpeg, it)
+                    } else {
+                        activity.toast("Save Failed - " + file.name)
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            activity.showErrorToast(e)
+            throw (e)
+        } catch (e: OutOfMemoryError) {
+            activity.toast(R.string.out_of_memory_error)
+        }
+    }
+
+    private fun saveBitmap(file: File, jpeg: InputStream, out: OutputStream) {
+        activity.toast(R.string.saving)
+        jpeg.copyTo(out)
+        scanFinalPath(file.absolutePath)
+        out.close()
+        Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).info("closed")
+
+    }
+
+    private fun scanFinalPath(path: String) {
+        val paths = arrayListOf(path)
+        activity.rescanPaths(paths) {
+            activity.fixDateTaken(paths, false)
+        }
     }
 }
