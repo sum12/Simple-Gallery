@@ -529,7 +529,7 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
             medium_name.text = medium.name
             medium_name.tag = medium.path
             CoroutineScope(Dispatchers.Main).async {
-                ServerDao.isPhotoCached(medium.path) {
+                ServerDao.isPhotoCached(medium) {
                     medium_name.setTextColor(context.resources.getColor(R.color.md_red_500_dark))
                 }
             }

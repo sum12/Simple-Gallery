@@ -95,7 +95,7 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
             val albumjb = albumjobs.get(path)
             if (albumjb == null){
                 albumjobs[path] = CoroutineScope(Dispatchers.IO).async {
-                    getPhotoFloat().albumJson(path)
+                    getPhotoFloat().albumJson(clean(path))
                 }
             }
             return albumjobs[path]!!
@@ -137,45 +137,48 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
         }
 
         suspend fun isAlbumCached(_subpath : String) : Boolean {
-            val subpath = clean(_subpath)
+//            val subpath = clean(_subpath)
             val cached = getRoot().await()
             return cached.albums.find { it.path == _subpath } != null
         }
 
-        suspend fun isPhotoCached(path: String, block: () -> Unit ) : Boolean {
-            val albumPath = path.getParentPath().substringAfterLast('/')
-            val name = path.substringAfterLast('/')
-            if (isAlbumCached(albumPath)) {
-                val cached = getRoot().await()
-                val found = clean(cached.albums.find { it.path == albumPath }?.path!!)
-
-                cached.albums.add(getAlbum(found).await())
-                if (albumjobs.get(found)!!.await().photos.find { it.name == name } != null){
+        suspend fun isPhotoCached(img: Medium, block: () -> Unit ) : Boolean {
+//            val albumPath = img.getParentPath().substringAfterLast('/')
+//            val name = path.substringAfterLast('/')
+            val pair = prepareDownload(img, false)
+            val album_path = pair.first
+            val name = pair.second
+            if (isAlbumCached(album_path)) {
+                val cached_album = getAlbum(album_path).await()
+                if (cached_album.photos.find { it.name == name } != null){
                     block()
+                    return true
                 }
             }
             return false
         }
 
-    }
 
-    private fun prepareUpload(media: Medium, album_path: String) : Pair<MultipartBody.Part, RequestBody> {
-        val file = File(media.path)
-        val fileReqBody = RequestBody.create(MediaType.parse("image/*"), file)
-        val pic = MultipartBody.Part.createFormData("pic", file.name, fileReqBody)
-        val albumpath = RequestBody.create(MediaType.parse("text/plain"), album_path)
-        return Pair(pic, albumpath)
-    }
+        private fun prepareUpload(media: Medium, album_path: String) : Pair<MultipartBody.Part, RequestBody> {
+            val file = File(media.path)
+            val fileReqBody = RequestBody.create(MediaType.parse("image/*"), file)
+            val pic = MultipartBody.Part.createFormData("pic", file.name, fileReqBody)
+            val albumpath = RequestBody.create(MediaType.parse("text/plain"), album_path)
+            return Pair(pic, albumpath)
+        }
 
+        private fun prepareDownload(media: Medium, cached: Boolean) : Pair<String, String> {
+            val album_path = media.parentPath.substringAfterLast('/')
+            if (cached)
+                return Pair(clean(album_path),clean(media.name+"_1024.jpg"))
+            else
+                return Pair(album_path,media.name)
+        }
 
-    private fun prepareDownload(media: Medium, album_path: String, cached: Boolean) : Pair<String, String> {
-        if (cached)
-            return Pair(clean(album_path),clean(media.name+"_1024.jpg"))
-        else
-            return Pair(album_path,media.name)
     }
 
     suspend fun upload(){
+        val touchedAlbums = ArrayList<String>()
         if (taskrunning){
             activtiy.toast("Task already running")
             return
@@ -188,6 +191,7 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
 //                val img = uploading[i]
                 val pair = prepareUpload(img, img.parentPath.substringAfterLast('/'))
                 val response = getPhotoFloat().upload(pair.first, pair.second)
+                touchedAlbums.add(img.parentPath.substringAfterLast('/'))
                 if (response.code() >= 200) {
                     activtiy.toast(img.name + " - Done ")
                 } else {
@@ -196,6 +200,9 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
                 }
             }
             getPhotoFloat().scan()
+            touchedAlbums.forEach {
+                albumjobs.remove(it)
+            }
             taskrunning = false
         }
     }
@@ -214,7 +221,7 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
                 currq = downloading
             }
             for (i in currq.iterator()) {
-                val pair = prepareDownload(i, i.parentPath.substringAfterLast('/'), cached)
+                val pair = prepareDownload(i, cached)
                 var response: retrofit2.Response<ResponseBody>
                 if (cached){
                     response = getPhotoFloat().photoFromCache(pair.first, pair.second)
