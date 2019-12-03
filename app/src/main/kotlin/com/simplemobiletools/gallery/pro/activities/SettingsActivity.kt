@@ -698,7 +698,7 @@ class SettingsActivity : SimpleActivity() {
                 put(ALBUM_COVERS, config.albumCovers)
             }
 
-            exportSettings(configItems, "gallery-settings.txt")
+            exportSettings(configItems)
         }
     }
 
