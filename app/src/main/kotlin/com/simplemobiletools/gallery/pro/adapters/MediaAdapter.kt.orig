@@ -1,11 +1,20 @@
 package com.simplemobiletools.gallery.pro.adapters
 
-
+<<<<<<< HEAD
+import android.annotation.TargetApi
+import android.content.Intent
+import android.graphics.Bitmap
+import android.media.ExifInterface
+import android.net.Uri
+import android.os.Build
+||||||| parent of 230d02822... allow creating file shortcuts from the thumbnail view
+=======
 import android.annotation.SuppressLint
 import android.content.Intent
 import android.content.pm.ShortcutInfo
 import android.content.pm.ShortcutManager
 import android.graphics.drawable.Icon
+>>>>>>> 230d02822... allow creating file shortcuts from the thumbnail view
 import android.os.Handler
 import android.os.Looper
 import android.view.Menu
@@ -20,13 +29,22 @@ import com.simplemobiletools.commons.dialogs.RenameDialog
 import com.simplemobiletools.commons.dialogs.RenameItemDialog
 import com.simplemobiletools.commons.extensions.*
 import com.simplemobiletools.commons.helpers.ensureBackgroundThread
+<<<<<<< HEAD
+import com.simplemobiletools.commons.helpers.isNougatPlus
+||||||| parent of 230d02822... allow creating file shortcuts from the thumbnail view
+=======
 import com.simplemobiletools.commons.helpers.isOreoPlus
+>>>>>>> 230d02822... allow creating file shortcuts from the thumbnail view
 import com.simplemobiletools.commons.models.FileDirItem
 import com.simplemobiletools.commons.views.FastScroller
 import com.simplemobiletools.commons.views.MyRecyclerView
 import com.simplemobiletools.gallery.pro.R
+<<<<<<< HEAD
 import com.simplemobiletools.gallery.pro.activities.BackgroundActivity
+||||||| parent of 230d02822... allow creating file shortcuts from the thumbnail view
+=======
 import com.simplemobiletools.gallery.pro.activities.ViewPagerActivity
+>>>>>>> 230d02822... allow creating file shortcuts from the thumbnail view
 import com.simplemobiletools.gallery.pro.dialogs.DeleteWithRememberDialog
 import com.simplemobiletools.gallery.pro.extensions.*
 import com.simplemobiletools.gallery.pro.helpers.*
@@ -223,9 +241,9 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
 
     override fun getItemKeyPosition(key: Int) = media.indexOfFirst { (it as? Medium)?.path?.hashCode() == key }
 
-    fun onActionModeCreated() {}
+    override fun onActionModeCreated() {}
 
-    fun onActionModeDestroyed() {}
+    override fun onActionModeDestroyed() {}
 
     override fun onViewRecycled(holder: ViewHolder) {
         super.onViewRecycled(holder)
