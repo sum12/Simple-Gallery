@@ -75,6 +75,7 @@ class MainActivity : SimpleActivity(), DirectoryOperationsListener {
     private var mTempShowHiddenHandler = Handler()
     private var mZoomListener: MyRecyclerView.MyZoomListener? = null
     private var mSearchMenuItem: MenuItem? = null
+    private var mLastMediaFetcher: MediaFetcher? = null
     private var mDirs = ArrayList<Directory>()
 
     private var mStoredAnimateGifs = true
@@ -255,6 +256,7 @@ class MainActivity : SimpleActivity(), DirectoryOperationsListener {
             unregisterFileUpdateListener()
 
             if (!config.showAll) {
+                mLastMediaFetcher?.shouldStop = true
                 GalleryDatabase.destroyInstance()
             }
         }
@@ -892,7 +894,8 @@ class MainActivity : SimpleActivity(), DirectoryOperationsListener {
         }
 
         // cached folders have been loaded, recheck folders one by one starting with the first displayed
-        val mediaFetcher = MediaFetcher(applicationContext)
+        mLastMediaFetcher?.shouldStop = true
+        mLastMediaFetcher = MediaFetcher(applicationContext)
         val getImagesOnly = mIsPickImageIntent || mIsGetImageContentIntent
         val getVideosOnly = mIsPickVideoIntent || mIsGetVideoContentIntent
         val hiddenString = getString(R.string.hidden)
@@ -911,7 +914,7 @@ class MainActivity : SimpleActivity(), DirectoryOperationsListener {
                     return
                 }
 
-                val curMedia = mediaFetcher.getFilesFrom(directory.path, getImagesOnly, getVideosOnly, getProperDateTaken, getProperFileSize, favoritePaths, false)
+                val curMedia = mLastMediaFetcher!!.getFilesFrom(directory.path, getImagesOnly, getVideosOnly, getProperDateTaken, getProperFileSize, favoritePaths, false)
                 val newDir = if (curMedia.isEmpty()) {
                     if (directory.path != tempFolderPath) {
                         dirPathsToRemove.add(directory.path)
@@ -966,7 +969,7 @@ class MainActivity : SimpleActivity(), DirectoryOperationsListener {
         } catch (ignored: Exception) {
         }
 
-        val foldersToScan = mediaFetcher.getFoldersToScan()
+        val foldersToScan = mLastMediaFetcher!!.getFoldersToScan()
         foldersToScan.add(FAVORITES)
         if (config.showRecycleBinAtFolders) {
             foldersToScan.add(RECYCLE_BIN)
@@ -984,7 +987,7 @@ class MainActivity : SimpleActivity(), DirectoryOperationsListener {
                 return
             }
 
-            val newMedia = mediaFetcher.getFilesFrom(folder, getImagesOnly, getVideosOnly, getProperDateTaken, getProperFileSize, favoritePaths, false)
+            val newMedia = mLastMediaFetcher!!.getFilesFrom(folder, getImagesOnly, getVideosOnly, getProperDateTaken, getProperFileSize, favoritePaths, false)
             if (newMedia.isEmpty()) {
                 continue
             }
