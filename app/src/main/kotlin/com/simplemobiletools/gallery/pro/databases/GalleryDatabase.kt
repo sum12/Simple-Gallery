@@ -17,7 +17,7 @@ import com.simplemobiletools.gallery.pro.models.Widget
 import com.simplemobiletools.gallery.pro.interfaces.*
 import com.simplemobiletools.gallery.pro.models.*
 
-@Database(entities = [Directory::class, Medium::class, Widget::class, DateTaken::class, Favorite::class], version = 7)
+@Database(entities = [Directory::class, Medium::class, Widget::class, DateTaken::class, Favorite::class], version = 8)
 abstract class GalleryDatabase : RoomDatabase() {
 
     abstract fun DirectoryDao(): DirectoryDao
@@ -42,6 +42,7 @@ abstract class GalleryDatabase : RoomDatabase() {
                                 .addMigrations(MIGRATION_4_5)
                                 .addMigrations(MIGRATION_5_6)
                                 .addMigrations(MIGRATION_6_7)
+                                .addMigrations(MIGRATION_7_8)
                                 .build()
                     }
                 }
@@ -73,6 +74,12 @@ abstract class GalleryDatabase : RoomDatabase() {
 
                 database.execSQL("CREATE UNIQUE INDEX `index_date_takens_full_path` ON `date_takens` (`full_path`)")
                 database.execSQL("CREATE UNIQUE INDEX `index_favorites_full_path` ON `favorites` (`full_path`)")
+            }
+        }
+
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE directories ADD COLUMN sort_value TEXT NOT NULL")
             }
         }
     }
