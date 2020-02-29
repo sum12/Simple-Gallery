@@ -49,7 +49,9 @@ android {
 
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
-        main.java.srcDirs += 'src/proprietary/kotlin'
+        if (is_proprietary) {
+            main.java.srcDirs += 'src/proprietary/kotlin'
+        }
     }
 
     flavorDimensions "licensing"
