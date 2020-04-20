@@ -135,6 +135,7 @@ const val IS_VIEW_INTENT = "is_view_intent"
 const val PICKED_PATHS = "picked_paths"
 const val SHOULD_INIT_FRAGMENT = "should_init_fragment"
 const val PORTRAIT_PATH = "portrait_path"
+const val SKIP_AUTHENTICATION = "skip_authentication"
 
 const val GET_DOWNLOAD_INTENT = "get_download_intent"
 const val GET_DOWNLOADCACHED_INTENT = "get_downloadcached_intent"
