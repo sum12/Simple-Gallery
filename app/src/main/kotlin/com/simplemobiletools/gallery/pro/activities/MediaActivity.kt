@@ -63,6 +63,8 @@ class MediaActivity : SimpleActivity(), MediaOperationsListener {
     private var mLoadedInitialPhotos = false
     private var mIsSearchOpen = false
     private var mLastSearchedText = ""
+    private var mDateFormat = ""
+    private var mTimeFormat = ""
     private var mLatestMediaId = 0L
     private var mLatestMediaDateId = 0L
     private var mLastMediaHandler = Handler()
@@ -131,6 +133,9 @@ class MediaActivity : SimpleActivity(), MediaOperationsListener {
 
     override fun onResume() {
         super.onResume()
+        mDateFormat = config.dateFormat
+        mTimeFormat = getTimeFormat()
+
         if (mStoredAnimateGifs != config.animateGifs) {
             getMediaAdapter()?.updateAnimateGifs(config.animateGifs)
         }
@@ -452,7 +457,7 @@ class MediaActivity : SimpleActivity(), MediaOperationsListener {
         if (mediaAdapter?.isASectionTitle(index) == true) {
             realIndex++
         }
-        return mediaAdapter?.getItemBubbleText(realIndex, sorting) ?: ""
+        return mediaAdapter?.getItemBubbleText(realIndex, sorting, mDateFormat, mTimeFormat) ?: ""
     }
 
     private fun checkLastMediaChanged() {
