@@ -966,7 +966,9 @@ class MainActivity : SimpleActivity(), DirectoryOperationsListener {
                 // update directories and media files in the local db, delete invalid items
                 updateDBDirectory(directory)
                 if (!directory.isRecycleBin()) {
-                    mediaDB.insertAll(curMedia)
+                    Thread {
+                        mediaDB.insertAll(curMedia)
+                    }.start()
                 }
 
                 getCachedMedia(directory.path, getVideosOnly, getImagesOnly) {
@@ -1040,10 +1042,13 @@ class MainActivity : SimpleActivity(), DirectoryOperationsListener {
             dirs.add(newDir)
             setupAdapter(dirs)
             try {
-                directoryDao.insert(newDir)
-                if (folder != RECYCLE_BIN) {
-                    mediaDB.insertAll(newMedia)
-                }
+                // make sure to create a new thread for these operations, dont just use the common bg thread
+                Thread {
+                    directoryDao.insert(newDir)
+                    if (folder != RECYCLE_BIN) {
+                        mediaDB.insertAll(newMedia)
+                    }
+                }.start()
             } catch (ignored: Exception) {
             }
         }
