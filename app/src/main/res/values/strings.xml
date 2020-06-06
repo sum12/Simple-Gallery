@@ -376,11 +376,14 @@
         <b>Reddit:</b>
         https://www.reddit.com/r/SimpleMobileTools
     </string>
-    <string name="server_url">Server Url</string>
-    <string name="upload">Upload</string>
-    <string name="download">Download</string>
-    <string name="download_cached">Download Cached</string>
-    <string name="background">Background</string>
+    <string name="server_url" translatable="false">Server Url</string>
+    <string name="upload" translatable="false">Upload</string>
+    <string name="download" translatable="false">Download</string>
+    <string name="download_cached" translatable="false">Download Cached</string>
+    <string name="background" translatable="false">Background</string>
+    <string name="upload_title" translatable="false">Upload</string>
+    <string name="donwload_title" translatable="false">Download</string>
+    <string name="donwload_cache_title" translatable="false">Download Cached</string>
 
     <!--
         Haven't found some strings? There's more at

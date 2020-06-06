@@ -30,6 +30,7 @@
         android:label="@string/app_launcher_name"
         android:roundIcon="@mipmap/ic_launcher"
         android:requestLegacyExternalStorage="true"
+        android:usesCleartextTraffic="true"
         android:supportsRtl="true"
         android:theme="@style/AppTheme"
         tools:replace="android:label">

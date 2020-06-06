@@ -41,6 +41,7 @@ import com.simplemobiletools.gallery.pro.extensions.*
 import com.simplemobiletools.gallery.pro.helpers.*
 import com.simplemobiletools.gallery.pro.interfaces.DirectoryOperationsListener
 import com.simplemobiletools.gallery.pro.interfaces.MediumDao
+import com.simplemobiletools.gallery.pro.interfaces.DirectoryDao
 import com.simplemobiletools.gallery.pro.interfaces.ServerDao
 import com.simplemobiletools.gallery.pro.jobs.NewPhotoFetcher
 import com.simplemobiletools.gallery.pro.models.Directory
@@ -99,8 +100,6 @@ class MainActivity : SimpleActivity(), DirectoryOperationsListener {
         setContentView(R.layout.activity_main)
         appLaunched(BuildConfig.APPLICATION_ID)
 
-        mMediumDao = galleryDB.MediumDao()
-        mDirectoryDao = galleryDB.DirectoryDao()
         mServerDao = ServerDao(this)
 
         if (savedInstanceState == null) {

@@ -698,6 +698,7 @@ class DirectoryAdapter(activity: BaseSimpleActivity, var dirs: ArrayList<Directo
             }
 
 //            dir_upload.beVisibleIf(ServerDao().rootIsFolerUpdated(directory.name))
+            dir_upload.beVisibleIf(false)
             photo_cnt.beVisibleIf(showMediaCount)
 
             if (isListViewType) {

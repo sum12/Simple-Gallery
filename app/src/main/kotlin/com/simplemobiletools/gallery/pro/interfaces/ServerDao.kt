@@ -19,6 +19,7 @@ import retrofit2.http.*
 import java.io.InputStream
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.logging.Logger
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
 
@@ -150,9 +151,15 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
             val name = pair.second
             if (isAlbumCached(album_path)) {
                 val cached_album = getAlbum(album_path).await()
-                if (cached_album.photos.find { it.name == name } != null){
+                if (cached_album.photos.find {
+                            //Logger.getLogger(ServerDao::class.java.name).info(" " + it.name + " "+name)
+                            it.name.toLowerCase() == name.toLowerCase()
+                        } != null){
                     block()
                     return true
+                }
+                else {
+                    Logger.getLogger(ServerDao::class.java.name).info("no cached !!!!!! " + name)
                 }
             }
             return false
@@ -171,8 +178,14 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
             val album_path = media.parentPath.substringAfterLast('/')
             if (cached)
                 return Pair(clean(album_path),clean(media.name+"_1024.jpg"))
-            else
-                return Pair(album_path,media.name)
+            else{
+                var media_name = media.name;
+                if (media.name.contains('.') ) {
+                    val split = media.name.split('.')
+                    media_name = split[0] +  "."+ split[1].toLowerCase()
+                }
+                return Pair(album_path,media_name)
+            }
         }
 
     }
@@ -244,8 +257,6 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
 
     }
 }
-
-
 
 
 

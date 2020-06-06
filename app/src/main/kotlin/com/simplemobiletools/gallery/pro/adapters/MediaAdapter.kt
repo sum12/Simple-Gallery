@@ -12,6 +12,7 @@ import android.view.Menu
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import com.bumptech.glide.Glide
 import com.simplemobiletools.commons.activities.BaseSimpleActivity
 import com.simplemobiletools.commons.adapters.MyRecyclerViewAdapter
@@ -223,9 +224,9 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
 
     override fun getItemKeyPosition(key: Int) = media.indexOfFirst { (it as? Medium)?.path?.hashCode() == key }
 
-    fun onActionModeCreated() {}
+    override fun onActionModeCreated() {}
 
-    fun onActionModeDestroyed() {}
+    override fun onActionModeDestroyed() {}
 
     override fun onViewRecycled(holder: ViewHolder) {
         super.onViewRecycled(holder)
@@ -577,7 +578,7 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
             medium_name.tag = medium.path
             CoroutineScope(Dispatchers.Main).async {
                 ServerDao.isPhotoCached(medium) {
-                    medium_name.setTextColor(context.resources.getColor(R.color.md_red_500_dark))
+                    medium_name.setTextColor(ContextCompat.getColor(context, R.color.md_red_500_dark))
                 }
             }
             val showVideoDuration = medium.isVideo() && config.showThumbnailVideoDuration
@@ -632,7 +633,12 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
             mServerDao.download(cached ,{ jpeg, p -> saveBitmapToFile(jpeg, p) } )
         }
         activity.startActivity(Intent(activity, BackgroundActivity::class.java).apply{
-            putExtra(GET_BACKGROUND_INTENT,"download")
+            if (cached){
+                putExtra(GET_BACKGROUND_INTENT, DOWNLOAD_CACHED)
+            }
+            else {
+                putExtra(GET_BACKGROUND_INTENT, DOWNLOAD)
+            }
         })
     }
 
@@ -642,7 +648,7 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
             mServerDao.upload()
         }
         activity.startActivity(Intent(activity, BackgroundActivity::class.java ).apply{
-            putExtra(GET_BACKGROUND_INTENT,"upload")
+            putExtra(GET_BACKGROUND_INTENT, UPLOAD)
         })
     }
 

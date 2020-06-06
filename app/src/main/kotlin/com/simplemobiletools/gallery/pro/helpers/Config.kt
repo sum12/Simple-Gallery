@@ -478,7 +478,7 @@ class Config(context: Context) : BaseConfig(context) {
         set(spamFoldersChecked) = prefs.edit().putBoolean(SPAM_FOLDERS_CHECKED, spamFoldersChecked).apply()
 
     var serverUrl: String
-        get() = prefs.getString(SERVER_URL, "")
+        get() = prefs.getString(SERVER_URL, "").toString()
         set(received) = prefs.edit().putString(SERVER_URL, received).apply()
 
 

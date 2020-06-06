@@ -43,6 +43,7 @@ import com.simplemobiletools.gallery.pro.extensions.*
 import com.simplemobiletools.gallery.pro.helpers.*
 import com.simplemobiletools.gallery.pro.interfaces.MediaOperationsListener
 import com.simplemobiletools.gallery.pro.interfaces.MediumDao
+import com.simplemobiletools.gallery.pro.interfaces.DirectoryDao
 import com.simplemobiletools.gallery.pro.interfaces.ServerDao
 import com.simplemobiletools.gallery.pro.models.Medium
 import com.simplemobiletools.gallery.pro.models.ThumbnailItem
@@ -94,8 +95,6 @@ class MediaActivity : SimpleActivity(), MediaOperationsListener {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_media)
 
-        mMediumDao = galleryDB.MediumDao()
-        mDirectoryDao = galleryDB.DirectoryDao()
         mServerDao = ServerDao(this)
 
         intent.apply {
