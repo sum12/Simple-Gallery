@@ -658,11 +658,13 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
             ensureBackgroundThread {
                 val file = File(path)
                 val fileDirItem = FileDirItem(path, path.getFilenameFromPath())
-                activity.getFileOutputStream(fileDirItem, true) {
-                    if (it != null) {
-                        saveBitmap(file, jpeg, it)
-                    } else {
-                        activity.toast("Save Failed - " + file.name)
+                activity.tryDeleteFileDirItem(fileDirItem, false, false) {
+                    activity.getFileOutputStream(fileDirItem, true) {
+                        if (it != null) {
+                            saveBitmap(file, jpeg, it)
+                        } else {
+                            activity.toast("Save Failed - " + file.name)
+                        }
                     }
                 }
             }
@@ -675,11 +677,10 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
     }
 
     private fun saveBitmap(file: File, jpeg: InputStream, out: OutputStream) {
-        activity.toast(R.string.saving)
+        //activity.toast(R.string.saving)
         jpeg.copyTo(out)
-        scanFinalPath(file.absolutePath)
         out.close()
-        Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).info("closed")
+        Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).info(file.absolutePath + " closed")
 
     }
 

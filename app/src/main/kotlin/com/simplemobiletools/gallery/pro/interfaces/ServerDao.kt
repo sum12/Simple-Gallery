@@ -13,6 +13,7 @@ import com.google.gson.annotations.SerializedName
 import com.simplemobiletools.commons.activities.BaseSimpleActivity
 import com.simplemobiletools.commons.extensions.*
 import com.simplemobiletools.gallery.pro.extensions.config
+import com.simplemobiletools.gallery.pro.extensions.fixDateTaken
 import kotlinx.coroutines.*
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
@@ -47,14 +48,14 @@ class BaseResponse {
 }
 
 
-class ServerDao(val activtiy: BaseSimpleActivity) {
+class ServerDao(val activity: BaseSimpleActivity) {
 
 
     init {
-        if (activtiy.config.serverUrl == "") {
+        if (activity.config.serverUrl == "") {
             null
         } else {
-            builder(activtiy.config.serverUrl)
+            builder(activity.config.serverUrl)
         }
     }
 
@@ -63,6 +64,7 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
         val uploading = ConcurrentLinkedQueue<Medium>()
         val downloading = ConcurrentLinkedQueue<Medium>()
         val downloadingCached = ConcurrentLinkedQueue<Medium>()
+        val working = ConcurrentLinkedQueue<Medium>()
         val albumjobs: HashMap<String, Deferred<CacheResponse>> = HashMap()
 
         private lateinit var _builder : Retrofit.Builder
@@ -177,7 +179,7 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
         private fun prepareDownload(media: Medium, cached: Boolean) : Pair<String, String> {
             val album_path = media.parentPath.substringAfterLast('/')
             if (cached)
-                return Pair(clean(album_path),clean(media.name+"_1024.jpg"))
+                return Pair(clean(album_path),clean(media.name+"_1024norot.jpg"))
             else{
                 var media_name = media.name;
                 if (media.name.contains('.') ) {
@@ -193,12 +195,14 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
     suspend fun upload(){
         val touchedAlbums = ArrayList<String>()
         if (taskrunning){
-            activtiy.toast("Task already running")
+            activity.toast("Task already running")
             return
         }
         CoroutineScope(Dispatchers.IO).launch {
             taskrunning = true
-            val itr = uploading.iterator()
+            working.addAll(uploading)
+            uploading.clear()
+            val itr = working.iterator()
             for (img in itr){
                 itr.remove()
 //                val img = uploading[i]
@@ -206,9 +210,9 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
                 val response = getPhotoFloat().upload(pair.first, pair.second)
                 touchedAlbums.add(img.parentPath.substringAfterLast('/'))
                 if (response.code() >= 200) {
-                    activtiy.toast(img.name + " - Done ")
+                    activity.toast(img.name + " - Done ")
                 } else {
-                    activtiy.toast(img.name + " Failed ("+response.code()+"):" + response.errorBody())
+                    activity.toast(img.name + " Failed ("+response.code()+"):" + response.errorBody())
                     break
                 }
             }
@@ -222,19 +226,23 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
 
     suspend fun download(cached: Boolean = false, goodownload: (InputStream, String) -> Unit){
         if (taskrunning){
-            activtiy.toast("Task already running")
+            activity.toast("Task already running")
             return
         }
+        val touchedAlbums = ArrayList<String>()
         CoroutineScope(Dispatchers.IO).launch {
             taskrunning = true
-            val currq: Queue<Medium>
             if (cached){
-                currq = downloadingCached
+                working.addAll(downloadingCached)
+                downloadingCached.clear()
             }else {
-                currq = downloading
+                working.addAll(downloading)
+                downloading.clear()
             }
-            for (i in currq.iterator()) {
-                val pair = prepareDownload(i, cached)
+            val itr = working.iterator()
+            for (img in itr) {
+                val pair = prepareDownload(img, cached)
+                touchedAlbums.add(img.parentPath.substringAfterLast('/'))
                 var response: retrofit2.Response<ResponseBody>
                 if (cached){
                     response = getPhotoFloat().photoFromCache(pair.first, pair.second)
@@ -243,14 +251,20 @@ class ServerDao(val activtiy: BaseSimpleActivity) {
                 }
                 if (response.code() >= 200) {
                     try {
-                        goodownload(response.body()!!.bytes().inputStream(), i.path)
+                        goodownload(response.body()!!.bytes().inputStream(), img.path)
                     }catch (e: Exception){
                         break
                     }
-                    currq.remove(i)
+//                    Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).info(pair.second + ": sumit removed from list")
+//                    Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).info(downloading.size.toString() + ": sumit size of donwloading")
+//                    Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).info(downloadingCached.size.toString() + ": sumit size of donwloading cached")
+                    working.remove(img)
                 } else {
-                    activtiy.toast(i.name + " Failed" + response.errorBody())
+                    activity.toast(img.name + " Failed" + response.errorBody())
                 }
+            }
+            activity.rescanPaths(touchedAlbums) {
+                activity.fixDateTaken(touchedAlbums, false)
             }
             taskrunning = false
         }

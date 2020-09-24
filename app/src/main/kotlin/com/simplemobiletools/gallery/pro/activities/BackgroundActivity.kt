@@ -380,16 +380,22 @@ class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
         mLastMediaHandler.removeCallbacksAndMessages(null)
         mLastMediaHandler.postDelayed({
             ensureBackgroundThread {
-                val mediaId = getLatestMediaId()
-                val mediaDateId = getLatestMediaByDateId()
-                if (mLatestMediaId != mediaId || mLatestMediaDateId != mediaDateId) {
-                    mLatestMediaId = mediaId
-                    mLatestMediaDateId = mediaDateId
+                if (mBackgroundType != UPLOAD) {
+                    val mediaId = getLatestMediaId()
+                    val mediaDateId = getLatestMediaByDateId()
+                    if (mLatestMediaId != mediaId || mLatestMediaDateId != mediaDateId) {
+                        mLatestMediaId = mediaId
+                        mLatestMediaDateId = mediaDateId
+                        runOnUiThread {
+                            getMedia()
+                        }
+                    } else {
+                        checkLastMediaChanged()
+                    }
+                } else {
                     runOnUiThread {
                         getMedia()
                     }
-                } else {
-                    checkLastMediaChanged()
                 }
             }
         }, LAST_MEDIA_CHECK_PERIOD)
@@ -462,11 +468,7 @@ class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
         }
 
         mIsGettingMedia = true
-        if (mBackgroundType == DOWNLOAD_CACHED || mBackgroundType == DOWNLOAD_CACHED) {
-            gotMedia(ArrayList<ThumbnailItem>(ServerDao.downloading.toList()), true)
-        }else {
-            gotMedia(ArrayList<ThumbnailItem>(ServerDao.uploading.toList()), true)
-        }
+        gotMedia(ArrayList<ThumbnailItem>(ServerDao.working.toList()), true)
         mLoadedInitialPhotos = true
       }
 
@@ -602,6 +604,7 @@ class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
         mMedia = media
 
         if (mMedia.isEmpty()){
+            Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).info(mBackgroundType + ": sumit media is empty")
             finish()
         }
 
