@@ -468,7 +468,7 @@ class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
         }
 
         mIsGettingMedia = true
-        gotMedia(ArrayList<ThumbnailItem>(ServerDao.working.toList()), true)
+        gotMedia(ArrayList<ThumbnailItem>(ServerDao.uploading.toList()), true)
         mLoadedInitialPhotos = true
       }
 

@@ -197,20 +197,26 @@ class ServerDao(val activity: BaseSimpleActivity) {
             activity.toast("Task already running")
             return
         }
+        val inflight = Channel<Medium>(4)
+        val client = getPhotoFloat()
         val touchedAlbums = ArrayList<String>()
+        CoroutineScope(Dispatchers.IO).launch {
+            for (i in uploading.iterator()) {
+                inflight.send(i)
+            }
+            inflight.close()
+        }
         CoroutineScope(Dispatchers.IO).launch {
             taskrunning = true
             working.addAll(uploading)
-            uploading.clear()
-            val itr = working.iterator()
-            for (img in itr){
-                itr.remove()
+            for (img in inflight){
 //                val img = uploading[i]
                 val pair = prepareUpload(img, img.parentPath.substringAfterLast('/'))
-                val response = getPhotoFloat().upload(pair.first, pair.second)
+                val response = client.upload(pair.first, pair.second)
                 touchedAlbums.add(img.parentPath.substringAfterLast('/'))
                 if (response.code() >= 200) {
                     activity.toast(img.name + " - Done ")
+                    uploading.remove(img)
                 } else {
                     activity.toast(img.name + " Failed ("+response.code()+"):" + response.errorBody())
                     break
