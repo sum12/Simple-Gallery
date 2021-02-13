@@ -15,11 +15,13 @@ import com.simplemobiletools.commons.extensions.*
 import com.simplemobiletools.gallery.pro.extensions.config
 import com.simplemobiletools.gallery.pro.extensions.fixDateTaken
 import kotlinx.coroutines.*
+import kotlinx.coroutines.channels.Channel
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
 import java.io.InputStream
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
+import java.util.concurrent.LinkedBlockingQueue
 import java.util.logging.Logger
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
@@ -148,7 +150,7 @@ class ServerDao(val activity: BaseSimpleActivity) {
         suspend fun isPhotoCached(img: Medium, block: () -> Unit ) : Boolean {
 //            val albumPath = img.getParentPath().substringAfterLast('/')
 //            val name = path.substringAfterLast('/')
-            val pair = prepareDownload(img, false)
+            val pair = prepareDownload(img.name, img.parentPath.substringAfterLast("/"),false)
             val album_path = pair.first
             val name = pair.second
             if (isAlbumCached(album_path)) {
@@ -176,28 +178,26 @@ class ServerDao(val activity: BaseSimpleActivity) {
             return Pair(pic, albumpath)
         }
 
-        private fun prepareDownload(media: Medium, cached: Boolean) : Pair<String, String> {
-            val album_path = media.parentPath.substringAfterLast('/')
+        private fun prepareDownload(name: String, album_path: String, cached: Boolean) : Pair<String, String> {
             if (cached)
-                return Pair(clean(album_path),clean(media.name+"_1024norot.jpg"))
+                return Pair(clean(album_path),clean(name+"_1024norot.jpg"))
             else{
-                var media_name = media.name;
-                if (media.name.contains('.') ) {
-                    val split = media.name.split('.')
+                var media_name = name
+                if (media_name.contains('.') ) {
+                    val split = media_name.split('.')
                     media_name = split[0] +  "."+ split[1].toLowerCase()
                 }
                 return Pair(album_path,media_name)
             }
         }
-
     }
 
     suspend fun upload(){
-        val touchedAlbums = ArrayList<String>()
         if (taskrunning){
             activity.toast("Task already running")
             return
         }
+        val touchedAlbums = ArrayList<String>()
         CoroutineScope(Dispatchers.IO).launch {
             taskrunning = true
             working.addAll(uploading)
@@ -229,25 +229,31 @@ class ServerDao(val activity: BaseSimpleActivity) {
             activity.toast("Task already running")
             return
         }
+        val inflight = Channel<Medium>(4)
+        val client = getPhotoFloat()
         val touchedAlbums = ArrayList<String>()
+        val currq: Queue<Medium>
+        if (cached) {
+            currq = downloadingCached
+        } else {
+            currq = downloading
+        }
         CoroutineScope(Dispatchers.IO).launch {
-            taskrunning = true
-            if (cached){
-                working.addAll(downloadingCached)
-                downloadingCached.clear()
-            }else {
-                working.addAll(downloading)
-                downloading.clear()
+            for (i in currq.iterator()) {
+                inflight.send(i)
             }
-            val itr = working.iterator()
-            for (img in itr) {
-                val pair = prepareDownload(img, cached)
+            inflight.close()
+        }
+        CoroutineScope(Dispatchers.IO).launch{
+            taskrunning = true
+            for (img in inflight){
+                val pair = prepareDownload(img.name, img.parentPath.substringAfterLast('/'), cached)
                 touchedAlbums.add(img.parentPath.substringAfterLast('/'))
-                var response: retrofit2.Response<ResponseBody>
-                if (cached){
-                    response = getPhotoFloat().photoFromCache(pair.first, pair.second)
-                }else {
-                    response = getPhotoFloat().photoOriginal(pair.first, pair.second)
+                val response: retrofit2.Response<ResponseBody>
+                if (cached) {
+                    response = client.photoFromCache(pair.first, pair.second)
+                } else {
+                    response = client.photoOriginal(pair.first, pair.second)
                 }
                 if (response.code() >= 200) {
                     try {
@@ -255,10 +261,10 @@ class ServerDao(val activity: BaseSimpleActivity) {
                     }catch (e: Exception){
                         break
                     }
+                    currq.remove(img)
 //                    Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).info(pair.second + ": sumit removed from list")
 //                    Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).info(downloading.size.toString() + ": sumit size of donwloading")
 //                    Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).info(downloadingCached.size.toString() + ": sumit size of donwloading cached")
-                    working.remove(img)
                 } else {
                     activity.toast(img.name + " Failed" + response.errorBody())
                 }
