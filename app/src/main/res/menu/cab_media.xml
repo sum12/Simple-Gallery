@@ -93,25 +93,34 @@
         android:title="@string/restore_selected_files"
         app:showAsAction="never"/>
     <item
-        android:id="@+id/cab_upload"
-        android:title="@string/upload"
-        app:showAsAction="never"/>
-    <item
-        android:id="@+id/cab_download"
-        android:title="@string/download"
-        app:showAsAction="never"/>
-    <item
-        android:id="@+id/cab_download_cached"
-        android:title="@string/download_cached"
-        app:showAsAction="never"/>
-    <item
-        android:id="@+id/cab_download_missing"
-        android:title="@string/download_missing"
-        app:showAsAction="never"/>
-    <item
-        android:id="@+id/cab_upload_missing"
-        android:title= "@string/upload_missing"
-        app:showAsAction="never"/>
+        android:id="@+id/server_button"
+        android:icon="@drawable/ic_cloud_circle_black_24dp"
+        android:title="@string/server_string"
+        app:showAsAction="ifRoom">
+        <menu>
+            <item
+                android:id="@+id/cab_upload"
+                android:title="@string/upload"
+                app:showAsAction="never"/>
+            <item
+                android:id="@+id/cab_download"
+                android:title="@string/download"
+                app:showAsAction="never"/>
+            <item
+                android:id="@+id/cab_download_cached"
+                android:title="@string/download_cached"
+                app:showAsAction="never"/>
+            <item
+                android:id="@+id/cab_download_missing"
+                android:title="@string/download_missing"
+                app:showAsAction="never"/>
+            <item
+                android:id="@+id/cab_upload_missing"
+                android:title= "@string/upload_missing"
+                app:showAsAction="never"/>
+        </menu>
+    </item>
+
     <item
         android:id="@+id/cab_fix_date_taken"
         android:title="@string/fix_date_taken"
