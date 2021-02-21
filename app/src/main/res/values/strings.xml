@@ -384,6 +384,7 @@
     <string name="upload_title" translatable="false">Upload</string>
     <string name="donwload_title" translatable="false">Download</string>
     <string name="donwload_cache_title" translatable="false">Download Cached</string>
+    <string name="download_missing">Download Missing</string>
 
     <!--
         Haven't found some strings? There's more at

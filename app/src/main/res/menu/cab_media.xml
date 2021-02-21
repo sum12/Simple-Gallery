@@ -105,6 +105,10 @@
         android:title="@string/download_cached"
         app:showAsAction="never"/>
     <item
+        android:id="@+id/cab_download_missing"
+        android:title="@string/download_missing"
+        app:showAsAction="never"/>
+    <item
         android:id="@+id/cab_fix_date_taken"
         android:title="@string/fix_date_taken"
         app:showAsAction="never"/>

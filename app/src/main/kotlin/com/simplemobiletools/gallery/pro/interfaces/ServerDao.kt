@@ -1,27 +1,27 @@
 package com.simplemobiletools.gallery.pro.interfaces
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import com.simplemobiletools.gallery.pro.models.Medium
-import okhttp3.*
-
-import retrofit2.Retrofit
-import java.io.File
-import okhttp3.MultipartBody
-import okhttp3.RequestBody
+import android.os.Build
+import androidx.annotation.RequiresApi
 import com.google.gson.annotations.SerializedName
 import com.simplemobiletools.commons.activities.BaseSimpleActivity
-import com.simplemobiletools.commons.extensions.*
+import com.simplemobiletools.commons.extensions.rescanPaths
+import com.simplemobiletools.commons.extensions.toast
 import com.simplemobiletools.gallery.pro.extensions.config
 import com.simplemobiletools.gallery.pro.extensions.fixDateTaken
+import com.simplemobiletools.gallery.pro.helpers.TYPE_IMAGES
+import com.simplemobiletools.gallery.pro.models.Medium
 import kotlinx.coroutines.*
 import kotlinx.coroutines.channels.Channel
+import okhttp3.*
+import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.*
+import java.io.File
 import java.io.InputStream
+import java.text.SimpleDateFormat
+import java.time.format.DateTimeFormatter
 import java.util.*
 import java.util.concurrent.ConcurrentLinkedQueue
-import java.util.concurrent.LinkedBlockingQueue
 import java.util.logging.Logger
 import kotlin.collections.ArrayList
 import kotlin.collections.HashMap
@@ -30,6 +30,9 @@ import kotlin.collections.HashMap
 class CacheResponse {
     @SerializedName("date")
     private var date : String? = null
+
+    @SerializedName("dateTimeOriginal")
+    var dateTimeOriginal : String? = null
 
     @SerializedName("path")
     lateinit var path : String
@@ -49,6 +52,27 @@ class BaseResponse {
     var msg: String? = null
 }
 
+data class MediumLike (
+        val path: String
+){
+    val name : String
+        get() {
+            return path.substringAfterLast("/")
+        }
+    val parentPath : String
+        get() {
+            return path.substringBeforeLast("/")
+        }
+    companion object {
+        fun from(photo:Medium) : MediumLike {
+            return MediumLike(path = photo.path)
+        }
+        fun from(album_path: String, cacheResponse: CacheResponse): MediumLike {
+            return MediumLike(path = album_path + "/" + cacheResponse.name)
+        }
+    }
+}
+
 
 class ServerDao(val activity: BaseSimpleActivity) {
 
@@ -62,10 +86,12 @@ class ServerDao(val activity: BaseSimpleActivity) {
     }
 
     companion object {
+        val logger = Logger.getLogger(ServerDao::class.java.name)
         var taskrunning = false
         val uploading = ConcurrentLinkedQueue<Medium>()
         val downloading = ConcurrentLinkedQueue<Medium>()
         val downloadingCached = ConcurrentLinkedQueue<Medium>()
+        val downloadingMissing = ConcurrentLinkedQueue<MediumLike>()
         val working = ConcurrentLinkedQueue<Medium>()
         val albumjobs: HashMap<String, Deferred<CacheResponse>> = HashMap()
 
@@ -107,6 +133,7 @@ class ServerDao(val activity: BaseSimpleActivity) {
         }
 
         private fun filter_and_queue (from: ArrayList<Medium>, to: Queue<Medium>) = from.filter { photo -> !to.map { p -> p.path }.contains( photo.path) }.map { photo -> to.add(photo) }
+        private fun filter_and_queue_media_like (from: ArrayList<MediumLike>, to: Queue<MediumLike>) = from.filter { photo -> !to.map { p -> p.path }.contains( photo.path) }.map { photo -> to.add(photo) }
 
 //    fun queue_upload(q: Queue<Medium>)   {
 //        uploading.addAll(q.toList())
@@ -115,6 +142,7 @@ class ServerDao(val activity: BaseSimpleActivity) {
 //        }
 //    }
 
+        fun queue_missing(q: ArrayList<MediumLike>) =  filter_and_queue_media_like(q,downloadingMissing)
         fun queue_download(q: ArrayList<Medium>, cached: Boolean) =  filter_and_queue(q, if (cached==false) downloading else downloadingCached)
         fun queue_upload(q: ArrayList<Medium>) =  filter_and_queue(q, uploading)
 
@@ -170,6 +198,21 @@ class ServerDao(val activity: BaseSimpleActivity) {
         }
 
 
+        suspend fun findMissing(media: ArrayList<Medium>, album_full_path: String, block: (ArrayList<MediumLike>) -> Unit) {
+
+            val album_path = album_full_path.substringAfterLast("/")
+            if (isAlbumCached(album_path)) {
+                val cached_album = getAlbum(album_path).await()
+                val cached_photo_names = cached_album.photos
+                val on_phone = media.map { it.name }
+                val missing = cached_album.photos.filterNot { it.name in on_phone }.map { MediumLike.from(album_full_path, it) }
+                logger.info("sumit " + missing.map { it.name })
+
+                block(missing as ArrayList<MediumLike>)
+            }
+        }
+
+
         private fun prepareUpload(media: Medium, album_path: String) : Pair<MultipartBody.Part, RequestBody> {
             val file = File(media.path)
             val fileReqBody = RequestBody.create(MediaType.parse("image/*"), file)
@@ -202,9 +245,10 @@ class ServerDao(val activity: BaseSimpleActivity) {
         val touchedAlbums = ArrayList<String>()
         CoroutineScope(Dispatchers.IO).launch {
             for (i in uploading.iterator()) {
-                inflight.send(i)
+                if (!inflight.isClosedForSend)
+                {inflight.send(i)}
             }
-            inflight.close()
+            (!inflight.isClosedForSend) && inflight.close()
         }
         CoroutineScope(Dispatchers.IO).launch {
             taskrunning = true
@@ -212,14 +256,21 @@ class ServerDao(val activity: BaseSimpleActivity) {
             for (img in inflight){
 //                val img = uploading[i]
                 val pair = prepareUpload(img, img.parentPath.substringAfterLast('/'))
-                val response = client.upload(pair.first, pair.second)
-                touchedAlbums.add(img.parentPath.substringAfterLast('/'))
+                lateinit var response: retrofit2.Response<BaseResponse>;
+                try {
+                    response = client.upload(pair.first, pair.second)
+                }catch (e: java.net.SocketTimeoutException){
+                    Logger.getLogger(ServerDao::class.java.name).info("could not upload "+ e.message)
+                    Logger.getLogger(ServerDao::class.java.name).info(e.toString())
+                    inflight.cancel(CancellationException("Failed to send: "+ e.message))
+                    break
+                }
+                 touchedAlbums.add(img.parentPath.substringAfterLast('/'))
                 if (response.code() >= 200) {
                     activity.toast(img.name + " - Done ")
                     uploading.remove(img)
                 } else {
                     activity.toast(img.name + " Failed ("+response.code()+"):" + response.errorBody())
-                    break
                 }
             }
             getPhotoFloat().scan()
@@ -230,49 +281,75 @@ class ServerDao(val activity: BaseSimpleActivity) {
         }
     }
 
-    suspend fun download(cached: Boolean = false, goodownload: (InputStream, String) -> Unit){
+    suspend fun download(cached: Boolean = false, missing:Boolean = false, goodownload: (InputStream, String) -> Unit){
         if (taskrunning){
             activity.toast("Task already running")
             return
         }
-        val inflight = Channel<Medium>(4)
+        val inflight = Channel<Any>(4)
         val client = getPhotoFloat()
         val touchedAlbums = ArrayList<String>()
-        val currq: Queue<Medium>
-        if (cached) {
+        val currq: Queue<*>
+        if (cached and  missing) {
+            currq = downloadingMissing
+        } else if (cached) {
             currq = downloadingCached
         } else {
             currq = downloading
         }
         CoroutineScope(Dispatchers.IO).launch {
             for (i in currq.iterator()) {
-                inflight.send(i)
+                if (!inflight.isClosedForSend) {
+                    inflight.send(i)
+                }
             }
-            inflight.close()
+            (!inflight.isClosedForSend) && inflight.close()
         }
         CoroutineScope(Dispatchers.IO).launch{
             taskrunning = true
+            lateinit var name: String
+            lateinit var path:String
+            lateinit var parentPath:String
             for (img in inflight){
-                val pair = prepareDownload(img.name, img.parentPath.substringAfterLast('/'), cached)
-                touchedAlbums.add(img.parentPath.substringAfterLast('/'))
+                when (img) {
+                    is MediumLike -> {
+                        name = img.name
+                        path = img.path
+                        parentPath = img.parentPath
+                    }
+                    is Medium -> {
+                        name = img.name
+                        path = img.path
+                        parentPath = img.parentPath
+                    }
+                }
+                val pair = prepareDownload(name, parentPath.substringAfterLast('/'), cached)
+                touchedAlbums.add(parentPath.substringAfterLast('/'))
                 val response: retrofit2.Response<ResponseBody>
-                if (cached) {
-                    response = client.photoFromCache(pair.first, pair.second)
-                } else {
-                    response = client.photoOriginal(pair.first, pair.second)
+                try {
+                    if (cached) {
+                        response = client.photoFromCache(pair.first, pair.second)
+                    } else {
+                        response = client.photoOriginal(pair.first, pair.second)
+                    }
+                } catch (e: java.lang.Exception) {
+                    logger.info("Unalbe to Download " + e.toString())
+                    continue
                 }
                 if (response.code() >= 200) {
                     try {
-                        goodownload(response.body()!!.bytes().inputStream(), img.path)
+                        goodownload(response.body()!!.bytes().inputStream(), path)
                     }catch (e: Exception){
                         break
+                        inflight.cancel()
+                        inflight.close()
                     }
                     currq.remove(img)
 //                    Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).info(pair.second + ": sumit removed from list")
 //                    Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).info(downloading.size.toString() + ": sumit size of donwloading")
 //                    Logger.getLogger(Logger.GLOBAL_LOGGER_NAME).info(downloadingCached.size.toString() + ": sumit size of donwloading cached")
                 } else {
-                    activity.toast(img.name + " Failed" + response.errorBody())
+                    activity.toast(name + " Failed" + response.errorBody())
                 }
             }
             activity.rescanPaths(touchedAlbums) {

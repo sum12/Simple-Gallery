@@ -32,6 +32,7 @@ import com.simplemobiletools.gallery.pro.dialogs.DeleteWithRememberDialog
 import com.simplemobiletools.gallery.pro.extensions.*
 import com.simplemobiletools.gallery.pro.helpers.*
 import com.simplemobiletools.gallery.pro.interfaces.MediaOperationsListener
+import com.simplemobiletools.gallery.pro.interfaces.MediumLike
 import com.simplemobiletools.gallery.pro.interfaces.ServerDao
 import com.simplemobiletools.gallery.pro.models.Medium
 import com.simplemobiletools.gallery.pro.models.ThumbnailItem
@@ -41,11 +42,13 @@ import kotlinx.android.synthetic.main.thumbnail_section.view.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
 import java.util.*
 import java.util.logging.Logger
+import kotlin.collections.ArrayList
 
 
 class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<ThumbnailItem>, val listener: MediaOperationsListener?, val isAGetIntent: Boolean,
@@ -59,6 +62,7 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
 
     private val config = activity.config
     private val viewType = config.getFolderViewType(if (config.showAll) SHOW_ALL else path)
+    private val mpath = path
     private val isListViewType : Boolean
             get() {
                 if (isBackgroundAdapter)
@@ -178,6 +182,7 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
             findItem(R.id.cab_upload).isVisible= !isBackgroundAdapter
             findItem(R.id.cab_download).isVisible= !isBackgroundAdapter
             findItem(R.id.cab_download_cached).isVisible= !isBackgroundAdapter
+            findItem(R.id.cab_download_missing).isVisible= !isBackgroundAdapter
 
         }
     }
@@ -186,7 +191,6 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
         if (selectedKeys.isEmpty()) {
             return
         }
- isBackgroundAdapter
 
         when (id) {
             R.id.cab_confirm_selection -> confirmSelection()
@@ -213,6 +217,7 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
             R.id.cab_upload-> upload()
             R.id.cab_download-> download()
             R.id.cab_download_cached-> download(cached = true)
+            R.id.cab_download_missing-> download_missing()
         }
     }
 
@@ -625,12 +630,24 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
     }
 
 
-
+    private fun download_missing() {
+        CoroutineScope(Dispatchers.IO).launch {
+            ServerDao.findMissing(media as ArrayList<Medium>, mpath) {
+                ServerDao.queue_missing(it)
+                CoroutineScope(Dispatchers.Main).launch {
+                    mServerDao.download(true, true, { jpeg, p -> saveBitmapToFile(jpeg, p) })
+                }
+            }
+        }
+        activity.startActivity(Intent(activity, BackgroundActivity::class.java).apply{
+            putExtra(GET_BACKGROUND_INTENT, DOWNLOAD_MISSING)
+        })
+    }
 
     private fun download(cached : Boolean = false){
         ServerDao.queue_download(getSelectedItems(),cached)
         CoroutineScope(Dispatchers.Main).async{
-            mServerDao.download(cached ,{ jpeg, p -> saveBitmapToFile(jpeg, p) } )
+            mServerDao.download(cached ,false ,{ jpeg, p -> saveBitmapToFile(jpeg, p) } )
         }
         activity.startActivity(Intent(activity, BackgroundActivity::class.java).apply{
             if (cached){

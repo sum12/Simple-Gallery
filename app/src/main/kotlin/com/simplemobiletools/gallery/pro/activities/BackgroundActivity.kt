@@ -177,6 +177,7 @@ class BackgroundActivity : SimpleActivity(), MediaOperationsListener {
                     UPLOAD -> getString(R.string.upload_title)
                     DOWNLOAD -> getString(R.string.donwload_title)
                     DOWNLOAD_CACHED -> getString(R.string.donwload_cache_title)
+                    DOWNLOAD_MISSING -> getString(R.string.download_missing)
                     else -> "NA"
                 }
                 updateActionBarTitle(titlebar)
