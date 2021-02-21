@@ -206,8 +206,9 @@ class ServerDao(val activity: BaseSimpleActivity) {
                 val missing = media.filterNot { it.name in alreadCached }
                 logger.info("sumit mising on server" + missing.map { it.name })
                 block(missing as ArrayList<Medium>)
+            }else {
+                block(media)
             }
-            block(media)
         }
 
 
