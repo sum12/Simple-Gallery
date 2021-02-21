@@ -648,7 +648,8 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
 
     private fun upload_missing() {
         CoroutineScope(Dispatchers.IO).launch {
-            ServerDao.findMissingOnServer(media as ArrayList<Medium>, mpath) {
+            val uploadabbe = media.filter { it is Medium && !it.isVideo() }.map { it as Medium}
+            ServerDao.findMissingOnServer(uploadabbe as ArrayList<Medium>, mpath) {
                 ServerDao.queue_upload(it)
                 CoroutineScope(Dispatchers.Main).launch {
                     mServerDao.upload()
