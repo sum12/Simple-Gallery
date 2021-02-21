@@ -657,7 +657,7 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
             }
         }
         activity.startActivity(Intent(activity, BackgroundActivity::class.java).apply{
-            putExtra(GET_BACKGROUND_INTENT, DOWNLOAD_MISSING)
+            putExtra(GET_BACKGROUND_INTENT, UPLOAD)
         })
     }
 
