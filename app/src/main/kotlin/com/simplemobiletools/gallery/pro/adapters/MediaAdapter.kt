@@ -183,6 +183,7 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
             findItem(R.id.cab_download).isVisible= !isBackgroundAdapter
             findItem(R.id.cab_download_cached).isVisible= !isBackgroundAdapter
             findItem(R.id.cab_download_missing).isVisible= !isBackgroundAdapter
+            findItem(R.id.cab_upload_missing).isVisible= !isBackgroundAdapter
 
         }
     }
@@ -218,6 +219,7 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
             R.id.cab_download-> download()
             R.id.cab_download_cached-> download(cached = true)
             R.id.cab_download_missing-> download_missing()
+            R.id.cab_upload_missing-> upload_missing()
         }
     }
 
@@ -636,6 +638,20 @@ class MediaAdapter(activity: BaseSimpleActivity, var media: MutableList<Thumbnai
                 ServerDao.queue_missing(it)
                 CoroutineScope(Dispatchers.Main).launch {
                     mServerDao.download(true, true, { jpeg, p -> saveBitmapToFile(jpeg, p) })
+                }
+            }
+        }
+        activity.startActivity(Intent(activity, BackgroundActivity::class.java).apply{
+            putExtra(GET_BACKGROUND_INTENT, DOWNLOAD_MISSING)
+        })
+    }
+
+    private fun upload_missing() {
+        CoroutineScope(Dispatchers.IO).launch {
+            ServerDao.findMissingOnServer(media as ArrayList<Medium>, mpath) {
+                ServerDao.queue_upload(it)
+                CoroutineScope(Dispatchers.Main).launch {
+                    mServerDao.upload()
                 }
             }
         }

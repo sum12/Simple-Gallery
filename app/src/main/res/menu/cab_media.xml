@@ -109,6 +109,10 @@
         android:title="@string/download_missing"
         app:showAsAction="never"/>
     <item
+        android:id="@+id/cab_upload_missing"
+        android:title= "@string/upload_missing"
+        app:showAsAction="never"/>
+    <item
         android:id="@+id/cab_fix_date_taken"
         android:title="@string/fix_date_taken"
         app:showAsAction="never"/>

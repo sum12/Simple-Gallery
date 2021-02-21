@@ -197,16 +197,28 @@ class ServerDao(val activity: BaseSimpleActivity) {
             return false
         }
 
+        suspend fun findMissingOnServer(media: ArrayList<Medium>, album_full_path: String, block: (ArrayList<Medium>) -> Unit) {
+
+            val album_path = album_full_path.substringAfterLast("/")
+            if (isAlbumCached(album_path)) {
+                val cached_album = getAlbum(album_path).await()
+                val alreadCached = cached_album.photos.map {it.name}
+                val missing = media.filterNot { it.name in alreadCached }
+                logger.info("sumit mising on server" + missing.map { it.name })
+                block(missing as ArrayList<Medium>)
+            }
+            block(media)
+        }
+
 
         suspend fun findMissing(media: ArrayList<Medium>, album_full_path: String, block: (ArrayList<MediumLike>) -> Unit) {
 
             val album_path = album_full_path.substringAfterLast("/")
             if (isAlbumCached(album_path)) {
                 val cached_album = getAlbum(album_path).await()
-                val cached_photo_names = cached_album.photos
                 val on_phone = media.map { it.name }
                 val missing = cached_album.photos.filterNot { it.name in on_phone }.map { MediumLike.from(album_full_path, it) }
-                logger.info("sumit " + missing.map { it.name })
+                logger.info("sumit missing on phone" + missing.map { it.name })
 
                 block(missing as ArrayList<MediumLike>)
             }
