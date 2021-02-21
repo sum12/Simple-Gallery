@@ -24,6 +24,8 @@ class ServerUrlDialog(val activity: BaseSimpleActivity, val saved_server_url: St
     init {
         val view = activity.layoutInflater.inflate(R.layout.dialog_server_url, null).apply {
             this.old_server_url.text = saved_server_url
+            this.new_server_url.hint = saved_server_url.toString()
+            this.new_server_url.setText(saved_server_url.toString())
         }
 
         AlertDialog.Builder(activity)
